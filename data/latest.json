@@ -1,0 +1,9 @@
+{
+  "temperature": null,
+  "humidity": null,
+  "pressure": null,
+  "gas_resistance": null,
+  "water_detected": null,
+  "updated_at": null,
+  "source": "ESP32C_BME680_PICOW_hjemme"
+}
