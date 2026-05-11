@@ -1,1 +1,1 @@
-{"humidity_percent": 29.77, "pressure_hpa": 999.4, "gas_kohms": 55.69, "temperature_c": 23.57, "source": "ESP32-C3_BME680_to_PicoW", "timestamp": "2026-05-11T19:03:50Z"}
+{"humidity_percent": 29.73, "pressure_hpa": 999.45, "gas_kohms": 58.34, "temperature_c": 23.64, "source": "ESP32-C3_BME680_to_PicoW", "timestamp": "2026-05-11T19:08:50Z"}
