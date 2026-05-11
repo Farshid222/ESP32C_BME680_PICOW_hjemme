@@ -1,9 +1,1 @@
-{
-  "temperature": null,
-  "humidity": null,
-  "pressure": null,
-  "gas_resistance": null,
-  "water_detected": null,
-  "updated_at": null,
-  "source": "ESP32C_BME680_PICOW_hjemme"
-}
+{"humidity_percent": 27.81, "pressure_hpa": 1001.24, "gas_kohms": 66.64, "temperature_c": 23.73, "source": "pico_w_github_test", "timestamp": "2026-05-11T10:39:34Z"}
