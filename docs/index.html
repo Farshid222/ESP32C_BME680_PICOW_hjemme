@@ -199,7 +199,7 @@
     <header>
       <div>
         <h1>BME680 Dashboard</h1>
-        <p class="subtitle">Live visning av sensordata fra BME680 via ESP32-C3 og Pico W. Data hentes fra GitHub-filen <strong>data/latest.json</strong>.</p>
+        <p class="subtitle">Live visning av sensordata fra BME680, vannsensor, ESP32-C3 og Pico W. Data hentes fra GitHub-filen <strong>data/latest.json</strong>.</p>
       </div>
       <div class="status-pill"><span id="statusDot" class="dot"></span><span id="statusText">Starter...</span></div>
     </header>
@@ -229,9 +229,21 @@
         <div class="bar"><div id="gasBar" class="fill"></div></div>
       </article>
 
+      <article class="card">
+        <div class="metric-label">Signal fra Pico W</div>
+        <div class="metric-value"><span id="signalLamp" class="big-lamp">●</span><span class="unit" id="signalLabel">--</span></div>
+        <div class="metric-label" id="signalInfo">Venter på data...</div>
+      </article>
+
+      <article class="card">
+        <div class="metric-label">Vannlekkasje</div>
+        <div class="metric-value"><span id="waterLamp" class="big-lamp">●</span><span class="unit" id="waterLabel">--</span></div>
+        <div class="metric-label">AO: <strong id="waterAo">--</strong> | DO: <strong id="waterDo">--</strong></div>
+      </article>
+
       <article class="card wide">
         <div class="meta">
-          <div>Siste måling: <strong id="timestamp">--</strong></div>
+          <div>Siste måling fra Pico W: <strong id="timestamp">--</strong></div>
           <div>Kilde: <strong id="source">--</strong></div>
           <div>Sist hentet av frontend: <strong id="frontendTime">--</strong></div>
           <div>GitHub-fil: <strong>data/latest.json</strong></div>
@@ -247,11 +259,12 @@
       </article>
     </section>
 
-    <footer>Auto-oppdateres hvert 60. sekund. Ikke legg GitHub-token i frontend-koden.</footer>
+    <footer>Auto-oppdateres hvert 60. sekund. Grønn signallampe betyr at siste måling er fersk. Rød betyr at ingen fersk måling er mottatt.</footer>
   </main>
 
   <script>
     const DATA_URL = "https://raw.githubusercontent.com/Farshid222/ESP32C_BME680_PICOW_hjemme/main/data/latest.json";
+    const SIGNAL_TIMEOUT_MINUTES = 10;
 
     const els = {
       statusDot: document.getElementById("statusDot"),
@@ -264,6 +277,13 @@
       humidityBar: document.getElementById("humidityBar"),
       pressureBar: document.getElementById("pressureBar"),
       gasBar: document.getElementById("gasBar"),
+      signalLamp: document.getElementById("signalLamp"),
+      signalLabel: document.getElementById("signalLabel"),
+      signalInfo: document.getElementById("signalInfo"),
+      waterLamp: document.getElementById("waterLamp"),
+      waterLabel: document.getElementById("waterLabel"),
+      waterAo: document.getElementById("waterAo"),
+      waterDo: document.getElementById("waterDo"),
       timestamp: document.getElementById("timestamp"),
       source: document.getElementById("source"),
       frontendTime: document.getElementById("frontendTime"),
@@ -289,6 +309,63 @@
       els.statusText.textContent = text;
     }
 
+    function setLamp(element, color) {
+      element.classList.remove("lamp-green", "lamp-red", "lamp-yellow");
+      element.classList.add(color);
+    }
+
+    function parseTimestamp(timestamp) {
+      if (!timestamp) return null;
+      const parsed = new Date(timestamp);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed;
+    }
+
+    function updateSignalLamp(data) {
+      const measuredAt = parseTimestamp(data.timestamp);
+      if (!measuredAt) {
+        setLamp(els.signalLamp, "lamp-red");
+        els.signalLabel.textContent = "Ingen tid";
+        els.signalInfo.textContent = "Mangler timestamp i latest.json";
+        return;
+      }
+
+      const ageMs = Date.now() - measuredAt.getTime();
+      const ageMinutes = ageMs / 60000;
+
+      if (ageMinutes <= SIGNAL_TIMEOUT_MINUTES) {
+        setLamp(els.signalLamp, "lamp-green");
+        els.signalLabel.textContent = "OK";
+        els.signalInfo.textContent = "Siste signal er " + ageMinutes.toFixed(1) + " min gammelt";
+      } else {
+        setLamp(els.signalLamp, "lamp-red");
+        els.signalLabel.textContent = "Ingen fersk data";
+        els.signalInfo.textContent = "Siste signal er " + ageMinutes.toFixed(1) + " min gammelt";
+      }
+    }
+
+    function updateWaterStatus(data) {
+      const detected = Boolean(data.water_detected);
+      const hasWaterFields = Object.prototype.hasOwnProperty.call(data, "water_detected");
+
+      els.waterAo.textContent = data.water_ao ?? "--";
+      els.waterDo.textContent = data.water_do ?? "--";
+
+      if (!hasWaterFields) {
+        setLamp(els.waterLamp, "lamp-yellow");
+        els.waterLabel.textContent = "Mangler felt";
+        return;
+      }
+
+      if (detected) {
+        setLamp(els.waterLamp, "lamp-red");
+        els.waterLabel.textContent = "LEKKASJE";
+      } else {
+        setLamp(els.waterLamp, "lamp-green");
+        els.waterLabel.textContent = "Tørt";
+      }
+    }
+
     function updateDashboard(data) {
       const temperature = data.temperature_c;
       const humidity = data.humidity_percent;
@@ -304,6 +381,9 @@
       els.humidityBar.style.width = percent(humidity, 0, 100) + "%";
       els.pressureBar.style.width = percent(pressure, 950, 1050) + "%";
       els.gasBar.style.width = percent(gas, 0, 150) + "%";
+
+      updateSignalLamp(data);
+      updateWaterStatus(data);
 
       els.timestamp.textContent = data.timestamp || "--";
       els.source.textContent = data.source || "--";
@@ -327,6 +407,9 @@
         setStatus("ok", "Tilkoblet");
       } catch (error) {
         setStatus("error", "Feil ved henting");
+        setLamp(els.signalLamp, "lamp-red");
+        els.signalLabel.textContent = "Feil";
+        els.signalInfo.textContent = "Kunne ikke hente latest.json";
         els.rawJson.textContent = String(error);
         console.error(error);
       }
