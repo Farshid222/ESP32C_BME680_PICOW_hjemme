@@ -97,6 +97,10 @@
       background: var(--bad);
     }
 
+    .dot.warn {
+      background: var(--warn);
+    }
+
     .big-lamp {
       font-size: 2.5rem;
       line-height: 1;
@@ -264,7 +268,7 @@
         <h1>BME680 + Vannlekkasje</h1>
         <p class="subtitle">
           Live dashboard for BME680, vannsensor, ESP32-C3 og Pico W.
-          Grønn signallampe betyr ferske data. Rød lekkasjelampe betyr at vann er oppdaget.
+          Grønn signallampe betyr fersk måling. Rød signallampe betyr at siste måling er for gammel.
         </p>
       </div>
 
@@ -335,6 +339,7 @@
           <div>Kilde: <strong id="source">--</strong></div>
           <div>BME680 status: <strong id="bmeStatus">--</strong></div>
           <div>Sist hentet av frontend: <strong id="frontendTime">--</strong></div>
+          <div>Alder på måling: <strong id="measurementAge">--</strong></div>
         </div>
       </article>
 
@@ -342,7 +347,7 @@
         <div>
           <div class="metric-label">Oppdatering</div>
           <div class="meta">
-            Frontend henter data hvert <strong>30. sekund</strong>.
+            Frontend henter JSON hvert <strong>30. sekund</strong>.
             Signal-lampen blir rød hvis siste måling er eldre enn <strong>2 minutter</strong>.
           </div>
         </div>
@@ -395,8 +400,8 @@
     const LATEST_URL = "https://raw.githubusercontent.com/Farshid222/ESP32C_BME680_PICOW_hjemme/main/data/latest.json";
     const HISTORY_URL = "https://raw.githubusercontent.com/Farshid222/ESP32C_BME680_PICOW_hjemme/main/data/history.json";
 
-    // Under testing er 2 minutter best.
-    // Når systemet fungerer stabilt, kan du sette denne til 10.
+    // Under testing: 2 minutter.
+    // Når alt er stabilt kan du endre til 10.
     const SIGNAL_TIMEOUT_MINUTES = 2;
 
     const REFRESH_INTERVAL_MS = 30000;
@@ -428,6 +433,7 @@
       source: document.getElementById("source"),
       bmeStatus: document.getElementById("bmeStatus"),
       frontendTime: document.getElementById("frontendTime"),
+      measurementAge: document.getElementById("measurementAge"),
 
       rawJson: document.getElementById("rawJson"),
     };
@@ -454,9 +460,18 @@
       return value.toFixed(digits);
     }
 
-    function setStatus(kind, text) {
-      els.statusDot.className =
-        "dot" + (kind === "ok" ? " ok" : kind === "error" ? " error" : "");
+    function setTopStatus(kind, text) {
+      let className = "dot";
+
+      if (kind === "ok") {
+        className += " ok";
+      } else if (kind === "error") {
+        className += " error";
+      } else if (kind === "warn") {
+        className += " warn";
+      }
+
+      els.statusDot.className = className;
       els.statusText.textContent = text;
     }
 
@@ -479,43 +494,73 @@
       return parsed;
     }
 
-    function updateSignalLamp(data) {
+    function calculateSignalState(data) {
       const measuredAt = parseTimestamp(data.timestamp);
 
       if (!measuredAt) {
-        setLamp(els.signalLamp, "lamp-red");
-        els.signalLabel.textContent = "Ingen tid";
-        els.signalInfo.textContent = "Mangler timestamp i latest.json";
-        return;
+        return {
+          kind: "error",
+          label: "Ingen tid",
+          info: "Mangler timestamp i latest.json",
+          ageMinutes: null
+        };
       }
 
       const now = Date.now();
       const measuredMs = measuredAt.getTime();
       const ageMinutes = (now - measuredMs) / 60000;
 
-      // Hvis timestamp ligger mer enn 1 minutt i fremtiden, er klokken feil.
       if (ageMinutes < -1) {
-        setLamp(els.signalLamp, "lamp-yellow");
-        els.signalLabel.textContent = "Klokkefeil";
-        els.signalInfo.textContent =
-          "Timestamp ligger " + Math.abs(ageMinutes).toFixed(1) + " min i fremtiden";
-        return;
+        return {
+          kind: "warn",
+          label: "Klokkefeil",
+          info: "Timestamp ligger " + Math.abs(ageMinutes).toFixed(1) + " min i fremtiden",
+          ageMinutes: ageMinutes
+        };
       }
 
-      // Fersk data.
       if (ageMinutes >= 0 && ageMinutes <= SIGNAL_TIMEOUT_MINUTES) {
+        return {
+          kind: "ok",
+          label: "Fersk data",
+          info: "Siste signal er " + ageMinutes.toFixed(1) + " min gammelt",
+          ageMinutes: ageMinutes
+        };
+      }
+
+      return {
+        kind: "error",
+        label: "Gammel data",
+        info: "Siste signal er " + ageMinutes.toFixed(1) + " min gammelt",
+        ageMinutes: ageMinutes
+      };
+    }
+
+    function updateSignalLamp(data) {
+      const state = calculateSignalState(data);
+
+      if (state.kind === "ok") {
         setLamp(els.signalLamp, "lamp-green");
         els.signalLabel.textContent = "OK";
-        els.signalInfo.textContent =
-          "Siste signal er " + ageMinutes.toFixed(1) + " min gammelt";
-        return;
+        els.signalInfo.textContent = state.info;
+        setTopStatus("ok", "Fersk måling");
+      } else if (state.kind === "warn") {
+        setLamp(els.signalLamp, "lamp-yellow");
+        els.signalLabel.textContent = state.label;
+        els.signalInfo.textContent = state.info;
+        setTopStatus("warn", "Klokkefeil");
+      } else {
+        setLamp(els.signalLamp, "lamp-red");
+        els.signalLabel.textContent = state.label;
+        els.signalInfo.textContent = state.info;
+        setTopStatus("error", "Ingen fersk måling");
       }
 
-      // Gammel data.
-      setLamp(els.signalLamp, "lamp-red");
-      els.signalLabel.textContent = "Ingen fersk data";
-      els.signalInfo.textContent =
-        "Siste signal er " + ageMinutes.toFixed(1) + " min gammelt";
+      if (state.ageMinutes === null || Number.isNaN(state.ageMinutes)) {
+        els.measurementAge.textContent = "--";
+      } else {
+        els.measurementAge.textContent = state.ageMinutes.toFixed(1) + " minutter";
+      }
     }
 
     function updateWaterStatus(data) {
@@ -692,7 +737,7 @@
 
     async function loadData(manual = false) {
       try {
-        setStatus("loading", manual ? "Oppdaterer..." : "Henter data...");
+        setTopStatus("warn", manual ? "Henter nå..." : "Henter JSON...");
 
         const latest = await fetchJson(LATEST_URL);
 
@@ -715,13 +760,11 @@
           updateCharts([latest]);
         }
 
-        setStatus("ok", "Data hentet");
-
       } catch (error) {
-        setStatus("error", "Feil ved henting");
+        setTopStatus("error", "Kan ikke hente JSON");
 
         setLamp(els.signalLamp, "lamp-red");
-        els.signalLabel.textContent = "Feil";
+        els.signalLabel.textContent = "Hentefeil";
         els.signalInfo.textContent = "Kunne ikke hente latest.json";
 
         els.temperature.textContent = "--";
@@ -729,6 +772,7 @@
         els.pressure.textContent = "--";
         els.gas.textContent = "--";
 
+        els.measurementAge.textContent = "--";
         els.rawJson.textContent = String(error);
 
         console.error(error);
