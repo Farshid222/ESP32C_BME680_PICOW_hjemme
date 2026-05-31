@@ -1,9 +1,9 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="no">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BME680 + Vannlekkasje Dashboard</title>
+  <title>Tannlegeklinikk rom 1 – vannalarm Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
@@ -265,10 +265,10 @@
   <main class="page">
     <header>
       <div>
-        <h1>BME680 + Vannlekkasje</h1>
+        <h1>Tannlegeklinikk rom 1 – vannalarm</h1>
         <p class="subtitle">
-          Live dashboard for BME680, vannsensor, ESP32-C3 og Pico W.
-          Grønn signallampe betyr fersk måling. Rød signallampe betyr at siste måling er for gammel.
+          Live dashboard for Tannlegeklinikk rom 1 – vannalarm, vannsensor, ESP32-C3 og Pico W.
+          GrÃ¸nn signallampe betyr fersk mÃ¥ling. RÃ¸d signallampe betyr at siste mÃ¥ling er for gammel.
         </p>
       </div>
 
@@ -282,7 +282,7 @@
       <article class="card">
         <div class="metric-label">Temperatur</div>
         <div class="metric-value">
-          <span id="temperature">--</span><span class="unit">°C</span>
+          <span id="temperature">--</span><span class="unit">Â°C</span>
         </div>
         <div class="bar"><div id="temperatureBar" class="fill"></div></div>
       </article>
@@ -306,7 +306,7 @@
       <article class="card">
         <div class="metric-label">Gassresistans</div>
         <div class="metric-value">
-          <span id="gas">--</span><span class="unit">kΩ</span>
+          <span id="gas">--</span><span class="unit">kÎ©</span>
         </div>
         <div class="bar"><div id="gasBar" class="fill"></div></div>
       </article>
@@ -314,16 +314,16 @@
       <article class="card">
         <div class="metric-label">Signal fra Pico W</div>
         <div class="metric-value">
-          <span id="signalLamp" class="big-lamp">●</span>
+          <span id="signalLamp" class="big-lamp">â—</span>
           <span class="unit" id="signalLabel">--</span>
         </div>
-        <div class="metric-label" id="signalInfo">Venter på data...</div>
+        <div class="metric-label" id="signalInfo">Venter pÃ¥ data...</div>
       </article>
 
       <article class="card">
         <div class="metric-label">Vannlekkasje</div>
         <div class="metric-value">
-          <span id="waterLamp" class="big-lamp">●</span>
+          <span id="waterLamp" class="big-lamp">â—</span>
           <span class="unit" id="waterLabel">--</span>
         </div>
         <div class="metric-label">
@@ -333,13 +333,13 @@
       </article>
 
       <article class="card half">
-        <div class="metric-label">Siste måling</div>
+        <div class="metric-label">Siste mÃ¥ling</div>
         <div class="meta">
           <div>Pico W timestamp: <strong id="timestamp">--</strong></div>
           <div>Kilde: <strong id="source">--</strong></div>
-          <div>BME680 status: <strong id="bmeStatus">--</strong></div>
+          <div>Tannlegeklinikk rom 1 – vannalarm status: <strong id="bmeStatus">--</strong></div>
           <div>Sist hentet av frontend: <strong id="frontendTime">--</strong></div>
-          <div>Alder på måling: <strong id="measurementAge">--</strong></div>
+          <div>Alder pÃ¥ mÃ¥ling: <strong id="measurementAge">--</strong></div>
         </div>
       </article>
 
@@ -348,10 +348,10 @@
           <div class="metric-label">Oppdatering</div>
           <div class="meta">
             Frontend henter JSON hvert <strong>30. sekund</strong>.
-            Signal-lampen blir rød hvis siste måling er eldre enn <strong>2 minutter</strong>.
+            Signal-lampen blir rÃ¸d hvis siste mÃ¥ling er eldre enn <strong>2 minutter</strong>.
           </div>
         </div>
-        <button onclick="loadData(true)">Oppdater nå</button>
+        <button onclick="loadData(true)">Oppdater nÃ¥</button>
       </article>
 
       <article class="card half">
@@ -385,8 +385,8 @@
       </article>
 
       <article class="card wide">
-        <div class="metric-label">Rå JSON fra latest.json</div>
-        <pre id="rawJson">Venter på data...</pre>
+        <div class="metric-label">RÃ¥ JSON fra latest.json</div>
+        <pre id="rawJson">Venter pÃ¥ data...</pre>
       </article>
     </section>
 
@@ -397,11 +397,11 @@
   </main>
 
   <script>
-    const LATEST_URL = "https://raw.githubusercontent.com/Farshid222/ESP32C_BME680_PICOW_hjemme/main/data/latest.json";
-    const HISTORY_URL = "https://raw.githubusercontent.com/Farshid222/ESP32C_BME680_PICOW_hjemme/main/data/history.json";
+    const LATEST_URL = "https://raw.githubusercontent.com/Farshid222/ESP32C_Tannlegeklinikk rom 1 – vannalarm_PICOW_hjemme/main/data/latest.json";
+    const HISTORY_URL = "https://raw.githubusercontent.com/Farshid222/ESP32C_Tannlegeklinikk rom 1 – vannalarm_PICOW_hjemme/main/data/history.json";
 
     // Under testing: 2 minutter.
-    // Når alt er stabilt kan du endre til 10.
+    // NÃ¥r alt er stabilt kan du endre til 10.
     const SIGNAL_TIMEOUT_MINUTES = 10;
 
     const REFRESH_INTERVAL_MS = 30000;
@@ -543,7 +543,7 @@
         setLamp(els.signalLamp, "lamp-green");
         els.signalLabel.textContent = "OK";
         els.signalInfo.textContent = state.info;
-        setTopStatus("ok", "Fersk måling");
+        setTopStatus("ok", "Fersk mÃ¥ling");
       } else if (state.kind === "warn") {
         setLamp(els.signalLamp, "lamp-yellow");
         els.signalLabel.textContent = state.label;
@@ -553,7 +553,7 @@
         setLamp(els.signalLamp, "lamp-red");
         els.signalLabel.textContent = state.label;
         els.signalInfo.textContent = state.info;
-        setTopStatus("error", "Ingen fersk måling");
+        setTopStatus("error", "Ingen fersk mÃ¥ling");
       }
 
       if (state.ageMinutes === null || Number.isNaN(state.ageMinutes)) {
@@ -581,13 +581,13 @@
         els.waterLabel.textContent = "LEKKASJE";
       } else {
         setLamp(els.waterLamp, "lamp-green");
-        els.waterLabel.textContent = "Tørt";
+        els.waterLabel.textContent = "TÃ¸rt";
       }
     }
 
     function updateBmeStatus(data) {
-      if (Object.prototype.hasOwnProperty.call(data, "bme680_ok")) {
-        els.bmeStatus.textContent = data.bme680_ok ? "OK" : "Feil";
+      if (Object.prototype.hasOwnProperty.call(data, "Tannlegeklinikk rom 1 – vannalarm_ok")) {
+        els.bmeStatus.textContent = data.Tannlegeklinikk rom 1 – vannalarm_ok ? "OK" : "Feil";
       } else {
         els.bmeStatus.textContent = "Ukjent";
       }
@@ -676,10 +676,10 @@
     }
 
     function initCharts() {
-      charts.temperature = createChart("temperatureChart", "Temperatur", "°C");
+      charts.temperature = createChart("temperatureChart", "Temperatur", "Â°C");
       charts.humidity = createChart("humidityChart", "Luftfuktighet", "%");
       charts.pressure = createChart("pressureChart", "Lufttrykk", "hPa");
-      charts.gas = createChart("gasChart", "Gass", "kΩ");
+      charts.gas = createChart("gasChart", "Gass", "kÎ©");
       charts.waterAo = createChart("waterAoChart", "Vann AO", "");
       charts.waterDetected = createChart("waterDetectedChart", "Lekkasje", "");
     }
@@ -737,7 +737,7 @@
 
     async function loadData(manual = false) {
       try {
-        setTopStatus("warn", manual ? "Henter nå..." : "Henter JSON...");
+        setTopStatus("warn", manual ? "Henter nÃ¥..." : "Henter JSON...");
 
         const latest = await fetchJson(LATEST_URL);
 
@@ -785,3 +785,4 @@
   </script>
 </body>
 </html>
+
