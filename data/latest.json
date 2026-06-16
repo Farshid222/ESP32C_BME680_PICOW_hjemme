@@ -1,1 +1,1 @@
-{"humidity_percent": 40.26, "water_detected": false, "water_do": 1, "water_ao": 4095, "source": "ESP32-C3_BME680_WATER_to_PicoW", "bme680_ok": true, "pressure_hpa": 1009.19, "timestamp": "2026-06-16T14:24:35Z", "temperature_c": 25.75, "gas_kohms": 124.91}
+{"humidity_percent": 40.28, "water_detected": true, "water_do": 0, "water_ao": 2746, "source": "ESP32-C3_BME680_WATER_to_PicoW", "bme680_ok": true, "pressure_hpa": 1009.18, "timestamp": "2026-06-16T14:25:36Z", "temperature_c": 25.45, "gas_kohms": 106.82}
