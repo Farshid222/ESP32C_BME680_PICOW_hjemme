@@ -398,9 +398,10 @@
   </main>
 
   <script>
-    const LATEST_URL = "https://raw.githubusercontent.com/Farshid222/tannlegeklinikk-rom1-vannalarm/main/data/latest.json";
-    const HISTORY_URL = "https://raw.githubusercontent.com/Farshid222/tannlegeklinikk-rom1-vannalarm/main/data/history.json";
 
+    const LATEST_URL = "data/latest.json";
+    const HISTORY_URL = "data/history.json";
+    
     const SIGNAL_TIMEOUT_MINUTES = 10;
     const REFRESH_INTERVAL_MS = 30000;
 
@@ -606,7 +607,7 @@
       updateWaterStatus(data);
       updateBmeStatus(data);
 
-      els.timestamp.textContent = data.timestamp || "--";
+      els.timestamp.textContent = data.timestamp_sweden || data.timestamp || "--";
       els.source.textContent = data.source || "--";
       els.frontendTime.textContent = new Date().toLocaleString("no-NO");
       els.rawJson.textContent = JSON.stringify(data, null, 2);
@@ -690,7 +691,7 @@
       const last = history.slice(-120);
 
       const labels = last.map(item => {
-        const d = parseTimestamp(item.timestamp);
+        const d = parseTimestamp(item.timestamp_sweden || item.timestamp_utc || item.timestamp);
         return d
           ? d.toLocaleTimeString("no-NO", { hour: "2-digit", minute: "2-digit" })
           : "--";
