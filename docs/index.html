@@ -2,10 +2,8 @@
 <html lang="no">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tannlegeklinikk rom 1 &ndash; vannalarm Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>Tannlegeklinikk rom 1 – vannalarm</title>
 
   <style>
     :root {
@@ -15,15 +13,13 @@
       --card-border: rgba(255, 255, 255, 0.18);
       --text: #f8fafc;
       --muted: #cbd5e1;
-      --accent: #38bdf8;
       --good: #34d399;
       --warn: #fbbf24;
       --bad: #fb7185;
+      --accent: #38bdf8;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -37,7 +33,7 @@
     }
 
     .page {
-      width: min(1180px, calc(100% - 32px));
+      width: min(1050px, calc(100% - 32px));
       margin: 0 auto;
       padding: 44px 0;
     }
@@ -45,16 +41,16 @@
     header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
       gap: 24px;
+      align-items: flex-start;
       margin-bottom: 28px;
     }
 
     h1 {
       margin: 0;
-      font-size: clamp(2rem, 5vw, 4rem);
+      font-size: clamp(2rem, 5vw, 3.8rem);
       line-height: 1;
-      letter-spacing: -0.06em;
+      letter-spacing: -0.05em;
     }
 
     .subtitle {
@@ -74,11 +70,9 @@
       background: rgba(255, 255, 255, 0.08);
       color: var(--muted);
       white-space: nowrap;
-      backdrop-filter: blur(12px);
     }
 
-    .dot,
-    .big-lamp {
+    .dot, .big-lamp {
       display: inline-block;
       border-radius: 50%;
       box-shadow: 0 0 18px currentColor;
@@ -90,35 +84,13 @@
       background: var(--warn);
     }
 
-    .dot.ok {
-      background: var(--good);
-    }
+    .ok { background: var(--good); }
+    .error { background: var(--bad); }
+    .warn { background: var(--warn); }
 
-    .dot.error {
-      background: var(--bad);
-    }
-
-    .dot.warn {
-      background: var(--warn);
-    }
-
-    .big-lamp {
-      font-size: 2.5rem;
-      line-height: 1;
-      margin-right: 8px;
-    }
-
-    .lamp-green {
-      color: var(--good);
-    }
-
-    .lamp-red {
-      color: var(--bad);
-    }
-
-    .lamp-yellow {
-      color: var(--warn);
-    }
+    .lamp-green { color: var(--good); }
+    .lamp-red { color: var(--bad); }
+    .lamp-yellow { color: var(--warn); }
 
     .grid {
       display: grid;
@@ -132,9 +104,11 @@
       border-radius: 28px;
       padding: 22px;
       background: var(--card);
-      backdrop-filter: blur(16px);
       box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
     }
+
+    .wide { grid-column: span 4; }
+    .half { grid-column: span 2; }
 
     .metric-label {
       color: var(--muted);
@@ -156,29 +130,10 @@
       margin-left: 4px;
     }
 
-    .bar {
-      height: 8px;
-      width: 100%;
-      background: rgba(255, 255, 255, 0.13);
-      border-radius: 999px;
-      margin-top: 18px;
-      overflow: hidden;
-    }
-
-    .fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, var(--accent), var(--good));
-      border-radius: inherit;
-      transition: width 600ms ease;
-    }
-
-    .wide {
-      grid-column: span 4;
-    }
-
-    .half {
-      grid-column: span 2;
+    .big-lamp {
+      font-size: 2.5rem;
+      line-height: 1;
+      margin-right: 8px;
     }
 
     .meta {
@@ -188,17 +143,7 @@
       font-size: 0.98rem;
     }
 
-    .meta strong {
-      color: var(--text);
-    }
-
-    .controls {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
+    .meta strong { color: var(--text); }
 
     button {
       appearance: none;
@@ -212,13 +157,8 @@
       box-shadow: 0 18px 40px rgba(56, 189, 248, 0.22);
     }
 
-    .chart-box {
-      height: 260px;
-      margin-top: 10px;
-    }
-
     pre {
-      max-height: 260px;
+      max-height: 340px;
       overflow: auto;
       padding: 16px;
       border-radius: 18px;
@@ -234,30 +174,15 @@
       font-size: 0.92rem;
     }
 
-    @media (max-width: 980px) {
-      header {
-        flex-direction: column;
-      }
-
-      .grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .wide,
-      .half {
-        grid-column: span 2;
-      }
+    @media (max-width: 900px) {
+      header { flex-direction: column; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .wide, .half { grid-column: span 2; }
     }
 
     @media (max-width: 560px) {
-      .grid {
-        grid-template-columns: 1fr;
-      }
-
-      .wide,
-      .half {
-        grid-column: span 1;
-      }
+      .grid { grid-template-columns: 1fr; }
+      .wide, .half { grid-column: span 1; }
     }
   </style>
 </head>
@@ -266,10 +191,10 @@
   <main class="page">
     <header>
       <div>
-        <h1>Tannlegeklinikk rom 1 &ndash; vannalarm</h1>
+        <h1>Tannlegeklinikk rom 1 – vannalarm</h1>
         <p class="subtitle">
-          Live dashboard for Tannlegeklinikk rom 1 &ndash; vannalarm, vannsensor, ESP32-C3 og Pico W.
-          Gr&oslash;nn signallampe betyr fersk m&aring;ling. R&oslash;d signallampe betyr at siste m&aring;ling er for gammel.
+          Live dashboard for rom 1. Denne versjonen viser latest.json direkte og bruker ikke Chart.js.
+          Dermed kan ikke graf-feil stoppe sensorverdiene.
         </p>
       </div>
 
@@ -282,49 +207,37 @@
     <section class="grid">
       <article class="card">
         <div class="metric-label">Temperatur</div>
-        <div class="metric-value">
-          <span id="temperature">--</span><span class="unit">&deg;C</span>
-        </div>
-        <div class="bar"><div id="temperatureBar" class="fill"></div></div>
+        <div class="metric-value"><span id="temperature">--</span><span class="unit">°C</span></div>
       </article>
 
       <article class="card">
         <div class="metric-label">Luftfuktighet</div>
-        <div class="metric-value">
-          <span id="humidity">--</span><span class="unit">%</span>
-        </div>
-        <div class="bar"><div id="humidityBar" class="fill"></div></div>
+        <div class="metric-value"><span id="humidity">--</span><span class="unit">%</span></div>
       </article>
 
       <article class="card">
         <div class="metric-label">Lufttrykk</div>
-        <div class="metric-value">
-          <span id="pressure">--</span><span class="unit">hPa</span>
-        </div>
-        <div class="bar"><div id="pressureBar" class="fill"></div></div>
+        <div class="metric-value"><span id="pressure">--</span><span class="unit">hPa</span></div>
       </article>
 
       <article class="card">
         <div class="metric-label">Gassresistans</div>
-        <div class="metric-value">
-          <span id="gas">--</span><span class="unit">k&Omega;</span>
-        </div>
-        <div class="bar"><div id="gasBar" class="fill"></div></div>
+        <div class="metric-value"><span id="gas">--</span><span class="unit">kΩ</span></div>
       </article>
 
-      <article class="card">
-        <div class="metric-label">Signal fra Pico W</div>
+      <article class="card half">
+        <div class="metric-label">Signal fra Pico 2 W</div>
         <div class="metric-value">
-          <span id="signalLamp" class="big-lamp">&#9679;</span>
+          <span id="signalLamp" class="big-lamp lamp-yellow">●</span>
           <span class="unit" id="signalLabel">--</span>
         </div>
-        <div class="metric-label" id="signalInfo">Venter p&aring; data...</div>
+        <div class="metric-label" id="signalInfo">Venter på data...</div>
       </article>
 
-      <article class="card">
+      <article class="card half">
         <div class="metric-label">Vannlekkasje</div>
         <div class="metric-value">
-          <span id="waterLamp" class="big-lamp">&#9679;</span>
+          <span id="waterLamp" class="big-lamp lamp-yellow">●</span>
           <span class="unit" id="waterLabel">--</span>
         </div>
         <div class="metric-label">
@@ -334,73 +247,40 @@
       </article>
 
       <article class="card half">
-        <div class="metric-label">Siste m&aring;ling</div>
+        <div class="metric-label">Siste måling</div>
         <div class="meta">
-          <div>Pico W timestamp: <strong id="timestamp">--</strong></div>
+          <div>Sverige-tid: <strong id="timestampSweden">--</strong></div>
+          <div>UTC: <strong id="timestampUtc">--</strong></div>
           <div>Kilde: <strong id="source">--</strong></div>
           <div>BME680 status: <strong id="bmeStatus">--</strong></div>
+          <div>Alder på måling: <strong id="measurementAge">--</strong></div>
           <div>Sist hentet av frontend: <strong id="frontendTime">--</strong></div>
-          <div>Alder p&aring; m&aring;ling: <strong id="measurementAge">--</strong></div>
         </div>
       </article>
 
-      <article class="card half controls">
-        <div>
-          <div class="metric-label">Oppdatering</div>
-          <div class="meta">
-            Frontend henter JSON hvert <strong>30. sekund</strong>.
-            Signal-lampen blir r&oslash;d hvis siste m&aring;ling er eldre enn <strong>10 minutter</strong>.
-          </div>
+      <article class="card half">
+        <div class="metric-label">Oppdatering</div>
+        <div class="meta">
+          <div>Frontend henter <strong>data/latest.json</strong> hvert 30. sekund.</div>
+          <div>Hvis siste måling er eldre enn 10 minutter, blir signalet rødt.</div>
         </div>
-        <button onclick="loadData(true)">Oppdater n&aring;</button>
-      </article>
-
-      <article class="card half">
-        <div class="metric-label">Temperaturkurve</div>
-        <div class="chart-box"><canvas id="temperatureChart"></canvas></div>
-      </article>
-
-      <article class="card half">
-        <div class="metric-label">Luftfuktighet</div>
-        <div class="chart-box"><canvas id="humidityChart"></canvas></div>
-      </article>
-
-      <article class="card half">
-        <div class="metric-label">Lufttrykk</div>
-        <div class="chart-box"><canvas id="pressureChart"></canvas></div>
-      </article>
-
-      <article class="card half">
-        <div class="metric-label">Gassresistans</div>
-        <div class="chart-box"><canvas id="gasChart"></canvas></div>
-      </article>
-
-      <article class="card half">
-        <div class="metric-label">Vannsensor AO</div>
-        <div class="chart-box"><canvas id="waterAoChart"></canvas></div>
-      </article>
-
-      <article class="card half">
-        <div class="metric-label">Vannlekkasje-status</div>
-        <div class="chart-box"><canvas id="waterDetectedChart"></canvas></div>
+        <br>
+        <button onclick="loadData(true)">Oppdater nå</button>
       </article>
 
       <article class="card wide">
-        <div class="metric-label">R&aring; JSON fra latest.json</div>
-        <pre id="rawJson">Venter p&aring; data...</pre>
+        <div class="metric-label">Rå JSON fra latest.json</div>
+        <pre id="rawJson">Venter på data...</pre>
       </article>
     </section>
 
     <footer>
-      Kurvene bruker <strong>data/history.json</strong>.
-      Hvis history.json mangler, vises ett punkt fra latest.json.
+      Data hentes fra <strong>data/latest.json</strong>.
     </footer>
   </main>
 
   <script>
     const LATEST_URL = "data/latest.json";
-    const HISTORY_URL = "data/history.json";
-
     const SIGNAL_TIMEOUT_MINUTES = 10;
     const REFRESH_INTERVAL_MS = 30000;
 
@@ -413,11 +293,6 @@
       pressure: document.getElementById("pressure"),
       gas: document.getElementById("gas"),
 
-      temperatureBar: document.getElementById("temperatureBar"),
-      humidityBar: document.getElementById("humidityBar"),
-      pressureBar: document.getElementById("pressureBar"),
-      gasBar: document.getElementById("gasBar"),
-
       signalLamp: document.getElementById("signalLamp"),
       signalLabel: document.getElementById("signalLabel"),
       signalInfo: document.getElementById("signalInfo"),
@@ -427,163 +302,92 @@
       waterAo: document.getElementById("waterAo"),
       waterDo: document.getElementById("waterDo"),
 
-      timestamp: document.getElementById("timestamp"),
+      timestampSweden: document.getElementById("timestampSweden"),
+      timestampUtc: document.getElementById("timestampUtc"),
       source: document.getElementById("source"),
       bmeStatus: document.getElementById("bmeStatus"),
-      frontendTime: document.getElementById("frontendTime"),
       measurementAge: document.getElementById("measurementAge"),
-
+      frontendTime: document.getElementById("frontendTime"),
       rawJson: document.getElementById("rawJson"),
     };
 
-    let charts = {};
-
-    function clamp(value, min, max) {
-      return Math.min(Math.max(value, min), max);
-    }
-
-    function percent(value, min, max) {
-      if (typeof value !== "number" || Number.isNaN(value)) {
-        return 0;
-      }
-      return clamp(((value - min) / (max - min)) * 100, 0, 100);
-    }
-
     function fmt(value, digits = 2) {
-      if (typeof value !== "number" || Number.isNaN(value)) {
-        return "--";
-      }
+      if (typeof value !== "number" || Number.isNaN(value)) return "--";
       return value.toFixed(digits);
     }
 
     function setTopStatus(kind, text) {
-      let className = "dot";
-      if (kind === "ok") {
-        className += " ok";
-      } else if (kind === "error") {
-        className += " error";
-      } else if (kind === "warn") {
-        className += " warn";
-      }
-      els.statusDot.className = className;
+      els.statusDot.className = "dot " + kind;
       els.statusText.textContent = text;
     }
 
-    function setLamp(element, color) {
+    function setLamp(element, className) {
       element.classList.remove("lamp-green", "lamp-red", "lamp-yellow");
-      element.classList.add(color);
+      element.classList.add(className);
     }
 
     function parseTimestamp(timestamp) {
-      if (!timestamp) {
-        return null;
-      }
+      if (!timestamp) return null;
       const parsed = new Date(timestamp);
-      if (Number.isNaN(parsed.getTime())) {
-        return null;
-      }
+      if (Number.isNaN(parsed.getTime())) return null;
       return parsed;
     }
 
-    function displayTime(data) {
-      return data.timestamp_sweden || data.timestamp_utc || data.timestamp || "--";
+    function calculateAgeMinutes(data) {
+      const timestamp = data.timestamp_utc || data.timestamp || data.timestamp_sweden;
+      const measuredAt = parseTimestamp(timestamp);
+      if (!measuredAt) return null;
+      return (Date.now() - measuredAt.getTime()) / 60000;
     }
 
-    function calculateSignalState(data) {
-      const measuredAt = parseTimestamp(data.timestamp_utc || data.timestamp || data.timestamp_sweden);
+    function updateSignal(data) {
+      const ageMinutes = calculateAgeMinutes(data);
 
-      if (!measuredAt) {
-        return {
-          kind: "error",
-          label: "Ingen tid",
-          info: "Mangler timestamp i latest.json",
-          ageMinutes: null
-        };
-      }
-
-      const now = Date.now();
-      const measuredMs = measuredAt.getTime();
-      const ageMinutes = (now - measuredMs) / 60000;
-
-      if (ageMinutes < -1) {
-        return {
-          kind: "warn",
-          label: "Klokkefeil",
-          info: "Timestamp ligger " + Math.abs(ageMinutes).toFixed(1) + " min i fremtiden",
-          ageMinutes: ageMinutes
-        };
-      }
-
-      if (ageMinutes >= 0 && ageMinutes <= SIGNAL_TIMEOUT_MINUTES) {
-        return {
-          kind: "ok",
-          label: "Fersk data",
-          info: "Siste signal er " + ageMinutes.toFixed(1) + " min gammelt",
-          ageMinutes: ageMinutes
-        };
-      }
-
-      return {
-        kind: "error",
-        label: "Gammel data",
-        info: "Siste signal er " + ageMinutes.toFixed(1) + " min gammelt",
-        ageMinutes: ageMinutes
-      };
-    }
-
-    function updateSignalLamp(data) {
-      const state = calculateSignalState(data);
-
-      if (state.kind === "ok") {
-        setLamp(els.signalLamp, "lamp-green");
-        els.signalLabel.textContent = "OK";
-        els.signalInfo.textContent = state.info;
-        setTopStatus("ok", "Fersk måling");
-      } else if (state.kind === "warn") {
-        setLamp(els.signalLamp, "lamp-yellow");
-        els.signalLabel.textContent = state.label;
-        els.signalInfo.textContent = state.info;
-        setTopStatus("warn", "Klokkefeil");
-      } else {
+      if (ageMinutes === null || Number.isNaN(ageMinutes)) {
         setLamp(els.signalLamp, "lamp-red");
-        els.signalLabel.textContent = state.label;
-        els.signalInfo.textContent = state.info;
-        setTopStatus("error", "Ingen fersk måling");
-      }
-
-      if (state.ageMinutes === null || Number.isNaN(state.ageMinutes)) {
+        els.signalLabel.textContent = "Ingen tid";
+        els.signalInfo.textContent = "Mangler timestamp";
         els.measurementAge.textContent = "--";
-      } else {
-        els.measurementAge.textContent = state.ageMinutes.toFixed(1) + " minutter";
-      }
-    }
-
-    function updateWaterStatus(data) {
-      const hasWaterFields = Object.prototype.hasOwnProperty.call(data, "water_detected");
-
-      els.waterAo.textContent = data.water_ao ?? "--";
-      els.waterDo.textContent = data.water_do ?? "--";
-
-      if (!hasWaterFields) {
-        setLamp(els.waterLamp, "lamp-yellow");
-        els.waterLabel.textContent = "Mangler felt";
+        setTopStatus("error", "Mangler tid");
         return;
       }
 
-      if (Boolean(data.water_detected)) {
-        setLamp(els.waterLamp, "lamp-red");
-        els.waterLabel.textContent = "LEKKASJE";
+      els.measurementAge.textContent = ageMinutes.toFixed(1) + " minutter";
+
+      if (ageMinutes < -1) {
+        setLamp(els.signalLamp, "lamp-yellow");
+        els.signalLabel.textContent = "Klokkefeil";
+        els.signalInfo.textContent = "Timestamp ligger i fremtiden";
+        setTopStatus("warn", "Klokkefeil");
+        return;
+      }
+
+      if (ageMinutes <= SIGNAL_TIMEOUT_MINUTES) {
+        setLamp(els.signalLamp, "lamp-green");
+        els.signalLabel.textContent = "OK";
+        els.signalInfo.textContent = "Siste signal er " + ageMinutes.toFixed(1) + " min gammelt";
+        setTopStatus("ok", "Fersk måling");
       } else {
-        setLamp(els.waterLamp, "lamp-green");
-        els.waterLabel.textContent = "Tørt";
+        setLamp(els.signalLamp, "lamp-red");
+        els.signalLabel.textContent = "Gammel data";
+        els.signalInfo.textContent = "Siste signal er " + ageMinutes.toFixed(1) + " min gammelt";
+        setTopStatus("error", "Gammel måling");
       }
     }
 
-    function updateBmeStatus(data) {
-      if (Object.prototype.hasOwnProperty.call(data, "bme680_ok")) {
-        els.bmeStatus.textContent = data.bme680_ok ? "OK" : "Feil";
+    function updateWater(data) {
+      els.waterAo.textContent = data.water_ao ?? "--";
+      els.waterDo.textContent = data.water_do ?? "--";
+
+      if (data.water_detected === true) {
+        setLamp(els.waterLamp, "lamp-red");
+        els.waterLabel.textContent = "LEKKASJE";
+      } else if (data.water_detected === false) {
+        setLamp(els.waterLamp, "lamp-green");
+        els.waterLabel.textContent = "Tørt";
       } else {
-        els.bmeStatus.textContent = "Ukjent";
+        setLamp(els.waterLamp, "lamp-yellow");
+        els.waterLabel.textContent = "Ukjent";
       }
     }
 
@@ -593,152 +397,23 @@
       els.pressure.textContent = fmt(data.pressure_hpa, 2);
       els.gas.textContent = fmt(data.gas_kohms, 2);
 
-      els.temperatureBar.style.width = percent(data.temperature_c, -10, 40) + "%";
-      els.humidityBar.style.width = percent(data.humidity_percent, 0, 100) + "%";
-      els.pressureBar.style.width = percent(data.pressure_hpa, 950, 1050) + "%";
-      els.gasBar.style.width = percent(data.gas_kohms, 0, 150) + "%";
-
-      updateSignalLamp(data);
-      updateWaterStatus(data);
-      updateBmeStatus(data);
-
-      els.timestamp.textContent = displayTime(data);
+      els.timestampSweden.textContent = data.timestamp_sweden || "--";
+      els.timestampUtc.textContent = data.timestamp_utc || data.timestamp || "--";
       els.source.textContent = data.source || "--";
+      els.bmeStatus.textContent = data.bme680_ok === true ? "OK" : "Feil/ukjent";
       els.frontendTime.textContent = new Date().toLocaleString("no-NO");
+
+      updateSignal(data);
+      updateWater(data);
+
       els.rawJson.textContent = JSON.stringify(data, null, 2);
     }
 
-    function chartOptions(unit) {
-      return {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-          mode: "index",
-          intersect: false
-        },
-        plugins: {
-          legend: {
-            display: false
-          },
-          tooltip: {
-            callbacks: {
-              label: ctx => `${ctx.parsed.y} ${unit}`
-            }
-          }
-        },
-        scales: {
-          x: {
-            ticks: {
-              color: "#cbd5e1",
-              maxTicksLimit: 6
-            },
-            grid: {
-              color: "rgba(255,255,255,0.08)"
-            }
-          },
-          y: {
-            ticks: {
-              color: "#cbd5e1"
-            },
-            grid: {
-              color: "rgba(255,255,255,0.08)"
-            }
-          }
-        }
-      };
-    }
-
-    function createChart(id, label, unit) {
-      if (typeof Chart === "undefined") {
-        console.warn("Chart.js er ikke lastet. Dashboardet viser målinger uten kurver.");
-        return null;
-      }
-
-      const canvas = document.getElementById(id);
-      if (!canvas) {
-        console.warn("Mangler canvas:", id);
-        return null;
-      }
-
-      return new Chart(canvas, {
-        type: "line",
-        data: {
-          labels: [],
-          datasets: [
-            {
-              label,
-              data: [],
-              tension: 0.35,
-              pointRadius: 2,
-              borderWidth: 2
-            }
-          ]
-        },
-        options: chartOptions(unit)
-      });
-    }
-
-    function initCharts() {
-      try {
-        charts.temperature = createChart("temperatureChart", "Temperatur", "°C");
-        charts.humidity = createChart("humidityChart", "Luftfuktighet", "%");
-        charts.pressure = createChart("pressureChart", "Lufttrykk", "hPa");
-        charts.gas = createChart("gasChart", "Gass", "kΩ");
-        charts.waterAo = createChart("waterAoChart", "Vann AO", "");
-        charts.waterDetected = createChart("waterDetectedChart", "Lekkasje", "");
-      } catch (error) {
-        console.warn("Kunne ikke starte kurver. Dashboardet fortsetter uten kurver.", error);
-        charts = {};
-      }
-    }
-
-    function updateOneChart(chart, labels, values) {
-      if (!chart) {
-        return;
-      }
-      chart.data.labels = labels;
-      chart.data.datasets[0].data = values;
-      chart.update("none");
-    }
-
-    function updateCharts(history) {
-      try {
-        if (!Array.isArray(history) || history.length === 0) {
-          return;
-        }
-
-        const last = history.slice(-120);
-
-        const labels = last.map(item => {
-          const d = parseTimestamp(item.timestamp_sweden || item.timestamp_utc || item.timestamp);
-          return d
-            ? d.toLocaleTimeString("no-NO", { hour: "2-digit", minute: "2-digit" })
-            : "--";
-        });
-
-        const map = key => last.map(item => item[key] ?? null);
-
-        updateOneChart(charts.temperature, labels, map("temperature_c"));
-        updateOneChart(charts.humidity, labels, map("humidity_percent"));
-        updateOneChart(charts.pressure, labels, map("pressure_hpa"));
-        updateOneChart(charts.gas, labels, map("gas_kohms"));
-        updateOneChart(charts.waterAo, labels, map("water_ao"));
-        updateOneChart(charts.waterDetected, labels, last.map(item => item.water_detected ? 1 : 0));
-      } catch (error) {
-        console.warn("Kunne ikke oppdatere kurver. Målingene vises fortsatt.", error);
-      }
-    }
-
     async function fetchJson(url) {
-      const response = await fetch(
-        url + "?cacheBust=" + Date.now(),
-        { cache: "no-store" }
-      );
-
+      const response = await fetch(url + "?cacheBust=" + Date.now(), { cache: "no-store" });
       if (!response.ok) {
         throw new Error("HTTP " + response.status + " " + response.statusText);
       }
-
       return response.json();
     }
 
@@ -749,41 +424,23 @@
         const latest = await fetchJson(LATEST_URL);
         updateDashboard(latest);
 
-        try {
-          const history = await fetchJson(HISTORY_URL);
-          if (Array.isArray(history) && history.length > 0) {
-            updateCharts(history);
-          } else {
-            updateCharts([latest]);
-          }
-        } catch (historyError) {
-          console.warn(
-            "Kunne ikke hente history.json. Bruker latest.json som fallback.",
-            historyError
-          );
-          updateCharts([latest]);
-        }
-
       } catch (error) {
         setTopStatus("error", "Kan ikke hente JSON");
 
         setLamp(els.signalLamp, "lamp-red");
         els.signalLabel.textContent = "Hentefeil";
-        els.signalInfo.textContent = "Kunne ikke hente latest.json";
+        els.signalInfo.textContent = "Kunne ikke hente data/latest.json";
 
         els.temperature.textContent = "--";
         els.humidity.textContent = "--";
         els.pressure.textContent = "--";
         els.gas.textContent = "--";
 
-        els.measurementAge.textContent = "--";
         els.rawJson.textContent = String(error);
-
         console.error(error);
       }
     }
 
-    initCharts();
     loadData();
     setInterval(loadData, REFRESH_INTERVAL_MS);
   </script>
