@@ -6,443 +6,225 @@
   <title>Tannlegeklinikk rom 1 – vannalarm</title>
 
   <style>
-    :root {
-      --bg1: #0f172a;
-      --bg2: #1e293b;
-      --card: rgba(255, 255, 255, 0.10);
-      --card-border: rgba(255, 255, 255, 0.18);
-      --text: #f8fafc;
-      --muted: #cbd5e1;
-      --good: #34d399;
-      --warn: #fbbf24;
-      --bad: #fb7185;
-      --accent: #38bdf8;
-    }
-
-    * { box-sizing: border-box; }
-
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.35), transparent 34rem),
-        radial-gradient(circle at bottom right, rgba(52, 211, 153, 0.25), transparent 30rem),
-        linear-gradient(135deg, var(--bg1), var(--bg2));
-    }
-
-    .page {
-      width: min(1050px, calc(100% - 32px));
-      margin: 0 auto;
-      padding: 44px 0;
-    }
-
-    header {
-      display: flex;
-      justify-content: space-between;
-      gap: 24px;
-      align-items: flex-start;
-      margin-bottom: 28px;
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 30px;
     }
 
     h1 {
-      margin: 0;
-      font-size: clamp(2rem, 5vw, 3.8rem);
-      line-height: 1;
-      letter-spacing: -0.05em;
+      font-size: 42px;
+      margin-bottom: 10px;
     }
 
-    .subtitle {
-      margin: 14px 0 0;
-      color: var(--muted);
-      font-size: 1.05rem;
-      max-width: 760px;
+    p {
+      color: #cbd5e1;
     }
-
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-      border: 1px solid var(--card-border);
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--muted);
-      white-space: nowrap;
-    }
-
-    .dot, .big-lamp {
-      display: inline-block;
-      border-radius: 50%;
-      box-shadow: 0 0 18px currentColor;
-    }
-
-    .dot {
-      width: 10px;
-      height: 10px;
-      background: var(--warn);
-    }
-
-    .ok { background: var(--good); }
-    .error { background: var(--bad); }
-    .warn { background: var(--warn); }
-
-    .lamp-green { color: var(--good); }
-    .lamp-red { color: var(--bad); }
-    .lamp-yellow { color: var(--warn); }
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 16px;
-      margin-top: 22px;
+      margin-top: 25px;
     }
 
     .card {
-      border: 1px solid var(--card-border);
-      border-radius: 28px;
-      padding: 22px;
-      background: var(--card);
-      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
-    }
-
-    .wide { grid-column: span 4; }
-    .half { grid-column: span 2; }
-
-    .metric-label {
-      color: var(--muted);
-      font-size: 0.92rem;
-      margin-bottom: 12px;
-    }
-
-    .metric-value {
-      font-size: clamp(2rem, 5vw, 3rem);
-      font-weight: 800;
-      letter-spacing: -0.05em;
-      line-height: 1;
-    }
-
-    .unit {
-      font-size: 1rem;
-      color: var(--muted);
-      font-weight: 600;
-      margin-left: 4px;
-    }
-
-    .big-lamp {
-      font-size: 2.5rem;
-      line-height: 1;
-      margin-right: 8px;
-    }
-
-    .meta {
-      display: grid;
-      gap: 10px;
-      color: var(--muted);
-      font-size: 0.98rem;
-    }
-
-    .meta strong { color: var(--text); }
-
-    button {
-      appearance: none;
-      border: 0;
-      cursor: pointer;
+      background: #1e293b;
+      border: 1px solid #334155;
       border-radius: 18px;
-      padding: 14px 18px;
-      color: #082f49;
-      background: linear-gradient(135deg, #7dd3fc, #34d399);
-      font-weight: 800;
-      box-shadow: 0 18px 40px rgba(56, 189, 248, 0.22);
+      padding: 20px;
+    }
+
+    .label {
+      color: #cbd5e1;
+      font-size: 15px;
+      margin-bottom: 10px;
+    }
+
+    .value {
+      font-size: 34px;
+      font-weight: bold;
+    }
+
+    .ok {
+      color: #34d399;
+    }
+
+    .bad {
+      color: #fb7185;
+    }
+
+    .warn {
+      color: #fbbf24;
     }
 
     pre {
-      max-height: 340px;
-      overflow: auto;
-      padding: 16px;
-      border-radius: 18px;
+      background: #020617;
       color: #dbeafe;
-      background: rgba(15, 23, 42, 0.70);
-      border: 1px solid rgba(255,255,255,0.12);
-      font-size: 0.85rem;
+      padding: 16px;
+      border-radius: 14px;
+      overflow: auto;
+      margin-top: 20px;
     }
 
-    footer {
-      color: var(--muted);
-      margin-top: 22px;
-      font-size: 0.92rem;
-    }
-
-    @media (max-width: 900px) {
-      header { flex-direction: column; }
-      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .wide, .half { grid-column: span 2; }
-    }
-
-    @media (max-width: 560px) {
-      .grid { grid-template-columns: 1fr; }
-      .wide, .half { grid-column: span 1; }
+    button {
+      margin-top: 20px;
+      padding: 12px 18px;
+      border: 0;
+      border-radius: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      background: #38bdf8;
+      color: #082f49;
     }
   </style>
 </head>
 
 <body>
-  <main class="page">
-    <header>
-      <div>
-        <h1>Tannlegeklinikk rom 1 – vannalarm</h1>
-        <p class="subtitle">
-          Live dashboard for rom 1. Denne versjonen viser latest.json direkte og bruker ikke Chart.js.
-          Dermed kan ikke graf-feil stoppe sensorverdiene.
-        </p>
-      </div>
+  <h1>Tannlegeklinikk rom 1 – vannalarm</h1>
+  <p>
+    Live dashboard. Henter data direkte fra
+    <strong>data/latest.json</strong>.
+  </p>
 
-      <div class="status-pill">
-        <span id="statusDot" class="dot"></span>
-        <span id="statusText">Starter...</span>
-      </div>
-    </header>
+  <button onclick="loadData()">Oppdater nå</button>
 
-    <section class="grid">
-      <article class="card">
-        <div class="metric-label">Temperatur</div>
-        <div class="metric-value"><span id="temperature">--</span><span class="unit">°C</span></div>
-      </article>
+  <div class="grid">
+    <div class="card">
+      <div class="label">Temperatur</div>
+      <div class="value"><span id="temperature">--</span> °C</div>
+    </div>
 
-      <article class="card">
-        <div class="metric-label">Luftfuktighet</div>
-        <div class="metric-value"><span id="humidity">--</span><span class="unit">%</span></div>
-      </article>
+    <div class="card">
+      <div class="label">Luftfuktighet</div>
+      <div class="value"><span id="humidity">--</span> %</div>
+    </div>
 
-      <article class="card">
-        <div class="metric-label">Lufttrykk</div>
-        <div class="metric-value"><span id="pressure">--</span><span class="unit">hPa</span></div>
-      </article>
+    <div class="card">
+      <div class="label">Lufttrykk</div>
+      <div class="value"><span id="pressure">--</span> hPa</div>
+    </div>
 
-      <article class="card">
-        <div class="metric-label">Gassresistans</div>
-        <div class="metric-value"><span id="gas">--</span><span class="unit">kΩ</span></div>
-      </article>
+    <div class="card">
+      <div class="label">Gassresistans</div>
+      <div class="value"><span id="gas">--</span> kΩ</div>
+    </div>
 
-      <article class="card half">
-        <div class="metric-label">Signal fra Pico 2 W</div>
-        <div class="metric-value">
-          <span id="signalLamp" class="big-lamp lamp-yellow">●</span>
-          <span class="unit" id="signalLabel">--</span>
-        </div>
-        <div class="metric-label" id="signalInfo">Venter på data...</div>
-      </article>
+    <div class="card">
+      <div class="label">Vannlekkasje</div>
+      <div class="value" id="waterStatus">--</div>
+      <p>AO: <span id="waterAo">--</span> | DO: <span id="waterDo">--</span></p>
+    </div>
 
-      <article class="card half">
-        <div class="metric-label">Vannlekkasje</div>
-        <div class="metric-value">
-          <span id="waterLamp" class="big-lamp lamp-yellow">●</span>
-          <span class="unit" id="waterLabel">--</span>
-        </div>
-        <div class="metric-label">
-          AO: <strong id="waterAo">--</strong> |
-          DO: <strong id="waterDo">--</strong>
-        </div>
-      </article>
+    <div class="card">
+      <div class="label">BME680</div>
+      <div class="value" id="bmeStatus">--</div>
+    </div>
 
-      <article class="card half">
-        <div class="metric-label">Siste måling</div>
-        <div class="meta">
-          <div>Sverige-tid: <strong id="timestampSweden">--</strong></div>
-          <div>UTC: <strong id="timestampUtc">--</strong></div>
-          <div>Kilde: <strong id="source">--</strong></div>
-          <div>BME680 status: <strong id="bmeStatus">--</strong></div>
-          <div>Alder på måling: <strong id="measurementAge">--</strong></div>
-          <div>Sist hentet av frontend: <strong id="frontendTime">--</strong></div>
-        </div>
-      </article>
+    <div class="card">
+      <div class="label">Sverige-tid</div>
+      <div id="timeSweden">--</div>
+    </div>
 
-      <article class="card half">
-        <div class="metric-label">Oppdatering</div>
-        <div class="meta">
-          <div>Frontend henter <strong>data/latest.json</strong> hvert 30. sekund.</div>
-          <div>Hvis siste måling er eldre enn 10 minutter, blir signalet rødt.</div>
-        </div>
-        <br>
-        <button onclick="loadData(true)">Oppdater nå</button>
-      </article>
+    <div class="card">
+      <div class="label">UTC-tid</div>
+      <div id="timeUtc">--</div>
+    </div>
 
-      <article class="card wide">
-        <div class="metric-label">Rå JSON fra latest.json</div>
-        <pre id="rawJson">Venter på data...</pre>
-      </article>
-    </section>
+    <div class="card">
+      <div class="label">Kilde</div>
+      <div id="source">--</div>
+    </div>
 
-    <footer>
-      Data hentes fra <strong>data/latest.json</strong>.
-    </footer>
-  </main>
+    <div class="card">
+      <div class="label">Sist hentet av siden</div>
+      <div id="frontendTime">--</div>
+    </div>
+  </div>
+
+  <h2>Rå JSON fra latest.json</h2>
+  <pre id="rawJson">Venter på data...</pre>
 
   <script>
-    const LATEST_URL = "data/latest.json";
-    const SIGNAL_TIMEOUT_MINUTES = 10;
-    const REFRESH_INTERVAL_MS = 30000;
-
-    const els = {
-      statusDot: document.getElementById("statusDot"),
-      statusText: document.getElementById("statusText"),
-
-      temperature: document.getElementById("temperature"),
-      humidity: document.getElementById("humidity"),
-      pressure: document.getElementById("pressure"),
-      gas: document.getElementById("gas"),
-
-      signalLamp: document.getElementById("signalLamp"),
-      signalLabel: document.getElementById("signalLabel"),
-      signalInfo: document.getElementById("signalInfo"),
-
-      waterLamp: document.getElementById("waterLamp"),
-      waterLabel: document.getElementById("waterLabel"),
-      waterAo: document.getElementById("waterAo"),
-      waterDo: document.getElementById("waterDo"),
-
-      timestampSweden: document.getElementById("timestampSweden"),
-      timestampUtc: document.getElementById("timestampUtc"),
-      source: document.getElementById("source"),
-      bmeStatus: document.getElementById("bmeStatus"),
-      measurementAge: document.getElementById("measurementAge"),
-      frontendTime: document.getElementById("frontendTime"),
-      rawJson: document.getElementById("rawJson"),
-    };
-
-    function fmt(value, digits = 2) {
-      if (typeof value !== "number" || Number.isNaN(value)) return "--";
-      return value.toFixed(digits);
-    }
-
-    function setTopStatus(kind, text) {
-      els.statusDot.className = "dot " + kind;
-      els.statusText.textContent = text;
-    }
-
-    function setLamp(element, className) {
-      element.classList.remove("lamp-green", "lamp-red", "lamp-yellow");
-      element.classList.add(className);
-    }
-
-    function parseTimestamp(timestamp) {
-      if (!timestamp) return null;
-      const parsed = new Date(timestamp);
-      if (Number.isNaN(parsed.getTime())) return null;
-      return parsed;
-    }
-
-    function calculateAgeMinutes(data) {
-      const timestamp = data.timestamp_utc || data.timestamp || data.timestamp_sweden;
-      const measuredAt = parseTimestamp(timestamp);
-      if (!measuredAt) return null;
-      return (Date.now() - measuredAt.getTime()) / 60000;
-    }
-
-    function updateSignal(data) {
-      const ageMinutes = calculateAgeMinutes(data);
-
-      if (ageMinutes === null || Number.isNaN(ageMinutes)) {
-        setLamp(els.signalLamp, "lamp-red");
-        els.signalLabel.textContent = "Ingen tid";
-        els.signalInfo.textContent = "Mangler timestamp";
-        els.measurementAge.textContent = "--";
-        setTopStatus("error", "Mangler tid");
-        return;
-      }
-
-      els.measurementAge.textContent = ageMinutes.toFixed(1) + " minutter";
-
-      if (ageMinutes < -1) {
-        setLamp(els.signalLamp, "lamp-yellow");
-        els.signalLabel.textContent = "Klokkefeil";
-        els.signalInfo.textContent = "Timestamp ligger i fremtiden";
-        setTopStatus("warn", "Klokkefeil");
-        return;
-      }
-
-      if (ageMinutes <= SIGNAL_TIMEOUT_MINUTES) {
-        setLamp(els.signalLamp, "lamp-green");
-        els.signalLabel.textContent = "OK";
-        els.signalInfo.textContent = "Siste signal er " + ageMinutes.toFixed(1) + " min gammelt";
-        setTopStatus("ok", "Fersk måling");
-      } else {
-        setLamp(els.signalLamp, "lamp-red");
-        els.signalLabel.textContent = "Gammel data";
-        els.signalInfo.textContent = "Siste signal er " + ageMinutes.toFixed(1) + " min gammelt";
-        setTopStatus("error", "Gammel måling");
-      }
-    }
-
-    function updateWater(data) {
-      els.waterAo.textContent = data.water_ao ?? "--";
-      els.waterDo.textContent = data.water_do ?? "--";
-
-      if (data.water_detected === true) {
-        setLamp(els.waterLamp, "lamp-red");
-        els.waterLabel.textContent = "LEKKASJE";
-      } else if (data.water_detected === false) {
-        setLamp(els.waterLamp, "lamp-green");
-        els.waterLabel.textContent = "Tørt";
-      } else {
-        setLamp(els.waterLamp, "lamp-yellow");
-        els.waterLabel.textContent = "Ukjent";
-      }
-    }
-
-    function updateDashboard(data) {
-      els.temperature.textContent = fmt(data.temperature_c, 2);
-      els.humidity.textContent = fmt(data.humidity_percent, 2);
-      els.pressure.textContent = fmt(data.pressure_hpa, 2);
-      els.gas.textContent = fmt(data.gas_kohms, 2);
-
-      els.timestampSweden.textContent = data.timestamp_sweden || "--";
-      els.timestampUtc.textContent = data.timestamp_utc || data.timestamp || "--";
-      els.source.textContent = data.source || "--";
-      els.bmeStatus.textContent = data.bme680_ok === true ? "OK" : "Feil/ukjent";
-      els.frontendTime.textContent = new Date().toLocaleString("no-NO");
-
-      updateSignal(data);
-      updateWater(data);
-
-      els.rawJson.textContent = JSON.stringify(data, null, 2);
-    }
-
-    async function fetchJson(url) {
-      const response = await fetch(url + "?cacheBust=" + Date.now(), { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error("HTTP " + response.status + " " + response.statusText);
-      }
-      return response.json();
-    }
-
-    async function loadData(manual = false) {
+    async function loadData() {
       try {
-        setTopStatus("warn", manual ? "Henter nå..." : "Henter JSON...");
+        const response = await fetch("data/latest.json?cacheBust=" + Date.now(), {
+          cache: "no-store"
+        });
 
-        const latest = await fetchJson(LATEST_URL);
-        updateDashboard(latest);
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status + " " + response.statusText);
+        }
+
+        const data = await response.json();
+
+        document.getElementById("temperature").textContent =
+          data.temperature_c ?? "--";
+
+        document.getElementById("humidity").textContent =
+          data.humidity_percent ?? "--";
+
+        document.getElementById("pressure").textContent =
+          data.pressure_hpa ?? "--";
+
+        document.getElementById("gas").textContent =
+          data.gas_kohms ?? "--";
+
+        document.getElementById("waterAo").textContent =
+          data.water_ao ?? "--";
+
+        document.getElementById("waterDo").textContent =
+          data.water_do ?? "--";
+
+        const waterStatus = document.getElementById("waterStatus");
+
+        if (data.water_detected === true) {
+          waterStatus.textContent = "LEKKASJE";
+          waterStatus.className = "value bad";
+        } else if (data.water_detected === false) {
+          waterStatus.textContent = "Tørt";
+          waterStatus.className = "value ok";
+        } else {
+          waterStatus.textContent = "Ukjent";
+          waterStatus.className = "value warn";
+        }
+
+        const bmeStatus = document.getElementById("bmeStatus");
+
+        if (data.bme680_ok === true) {
+          bmeStatus.textContent = "OK";
+          bmeStatus.className = "value ok";
+        } else {
+          bmeStatus.textContent = "Feil";
+          bmeStatus.className = "value bad";
+        }
+
+        document.getElementById("timeSweden").textContent =
+          data.timestamp_sweden || "--";
+
+        document.getElementById("timeUtc").textContent =
+          data.timestamp_utc || data.timestamp || "--";
+
+        document.getElementById("source").textContent =
+          data.source || "--";
+
+        document.getElementById("frontendTime").textContent =
+          new Date().toLocaleString("no-NO");
+
+        document.getElementById("rawJson").textContent =
+          JSON.stringify(data, null, 2);
 
       } catch (error) {
-        setTopStatus("error", "Kan ikke hente JSON");
-
-        setLamp(els.signalLamp, "lamp-red");
-        els.signalLabel.textContent = "Hentefeil";
-        els.signalInfo.textContent = "Kunne ikke hente data/latest.json";
-
-        els.temperature.textContent = "--";
-        els.humidity.textContent = "--";
-        els.pressure.textContent = "--";
-        els.gas.textContent = "--";
-
-        els.rawJson.textContent = String(error);
-        console.error(error);
+        document.getElementById("rawJson").textContent =
+          "FEIL: " + error;
       }
     }
 
     loadData();
-    setInterval(loadData, REFRESH_INTERVAL_MS);
+    setInterval(loadData, 30000);
   </script>
 </body>
 </html>
