@@ -398,10 +398,9 @@
   </main>
 
   <script>
-
     const LATEST_URL = "data/latest.json";
     const HISTORY_URL = "data/history.json";
-    
+
     const SIGNAL_TIMEOUT_MINUTES = 10;
     const REFRESH_INTERVAL_MS = 30000;
 
@@ -447,7 +446,6 @@
       if (typeof value !== "number" || Number.isNaN(value)) {
         return 0;
       }
-
       return clamp(((value - min) / (max - min)) * 100, 0, 100);
     }
 
@@ -455,13 +453,11 @@
       if (typeof value !== "number" || Number.isNaN(value)) {
         return "--";
       }
-
       return value.toFixed(digits);
     }
 
     function setTopStatus(kind, text) {
       let className = "dot";
-
       if (kind === "ok") {
         className += " ok";
       } else if (kind === "error") {
@@ -469,7 +465,6 @@
       } else if (kind === "warn") {
         className += " warn";
       }
-
       els.statusDot.className = className;
       els.statusText.textContent = text;
     }
@@ -483,18 +478,19 @@
       if (!timestamp) {
         return null;
       }
-
       const parsed = new Date(timestamp);
-
       if (Number.isNaN(parsed.getTime())) {
         return null;
       }
-
       return parsed;
     }
 
+    function displayTime(data) {
+      return data.timestamp_sweden || data.timestamp_utc || data.timestamp || "--";
+    }
+
     function calculateSignalState(data) {
-      const measuredAt = parseTimestamp(data.timestamp);
+      const measuredAt = parseTimestamp(data.timestamp_utc || data.timestamp || data.timestamp_sweden);
 
       if (!measuredAt) {
         return {
@@ -542,7 +538,7 @@
         setLamp(els.signalLamp, "lamp-green");
         els.signalLabel.textContent = "OK";
         els.signalInfo.textContent = state.info;
-        setTopStatus("ok", "Fersk m\u00E5ling");
+        setTopStatus("ok", "Fersk måling");
       } else if (state.kind === "warn") {
         setLamp(els.signalLamp, "lamp-yellow");
         els.signalLabel.textContent = state.label;
@@ -552,7 +548,7 @@
         setLamp(els.signalLamp, "lamp-red");
         els.signalLabel.textContent = state.label;
         els.signalInfo.textContent = state.info;
-        setTopStatus("error", "Ingen fersk m\u00E5ling");
+        setTopStatus("error", "Ingen fersk måling");
       }
 
       if (state.ageMinutes === null || Number.isNaN(state.ageMinutes)) {
@@ -563,8 +559,7 @@
     }
 
     function updateWaterStatus(data) {
-      const hasWaterFields =
-        Object.prototype.hasOwnProperty.call(data, "water_detected");
+      const hasWaterFields = Object.prototype.hasOwnProperty.call(data, "water_detected");
 
       els.waterAo.textContent = data.water_ao ?? "--";
       els.waterDo.textContent = data.water_do ?? "--";
@@ -580,7 +575,7 @@
         els.waterLabel.textContent = "LEKKASJE";
       } else {
         setLamp(els.waterLamp, "lamp-green");
-        els.waterLabel.textContent = "T\u00F8rt";
+        els.waterLabel.textContent = "Tørt";
       }
     }
 
@@ -607,7 +602,7 @@
       updateWaterStatus(data);
       updateBmeStatus(data);
 
-      els.timestamp.textContent = data.timestamp_sweden || data.timestamp || "--";
+      els.timestamp.textContent = displayTime(data);
       els.source.textContent = data.source || "--";
       els.frontendTime.textContent = new Date().toLocaleString("no-NO");
       els.rawJson.textContent = JSON.stringify(data, null, 2);
@@ -654,9 +649,18 @@
     }
 
     function createChart(id, label, unit) {
-      const ctx = document.getElementById(id);
+      if (typeof Chart === "undefined") {
+        console.warn("Chart.js er ikke lastet. Dashboardet viser målinger uten kurver.");
+        return null;
+      }
 
-      return new Chart(ctx, {
+      const canvas = document.getElementById(id);
+      if (!canvas) {
+        console.warn("Mangler canvas:", id);
+        return null;
+      }
+
+      return new Chart(canvas, {
         type: "line",
         data: {
           labels: [],
@@ -675,50 +679,54 @@
     }
 
     function initCharts() {
-      charts.temperature = createChart("temperatureChart", "Temperatur", "\u00B0C");
-      charts.humidity = createChart("humidityChart", "Luftfuktighet", "%");
-      charts.pressure = createChart("pressureChart", "Lufttrykk", "hPa");
-      charts.gas = createChart("gasChart", "Gass", "k\u03A9");
-      charts.waterAo = createChart("waterAoChart", "Vann AO", "");
-      charts.waterDetected = createChart("waterDetectedChart", "Lekkasje", "");
+      try {
+        charts.temperature = createChart("temperatureChart", "Temperatur", "°C");
+        charts.humidity = createChart("humidityChart", "Luftfuktighet", "%");
+        charts.pressure = createChart("pressureChart", "Lufttrykk", "hPa");
+        charts.gas = createChart("gasChart", "Gass", "kΩ");
+        charts.waterAo = createChart("waterAoChart", "Vann AO", "");
+        charts.waterDetected = createChart("waterDetectedChart", "Lekkasje", "");
+      } catch (error) {
+        console.warn("Kunne ikke starte kurver. Dashboardet fortsetter uten kurver.", error);
+        charts = {};
+      }
+    }
+
+    function updateOneChart(chart, labels, values) {
+      if (!chart) {
+        return;
+      }
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = values;
+      chart.update("none");
     }
 
     function updateCharts(history) {
-      if (!Array.isArray(history) || history.length === 0) {
-        return;
+      try {
+        if (!Array.isArray(history) || history.length === 0) {
+          return;
+        }
+
+        const last = history.slice(-120);
+
+        const labels = last.map(item => {
+          const d = parseTimestamp(item.timestamp_sweden || item.timestamp_utc || item.timestamp);
+          return d
+            ? d.toLocaleTimeString("no-NO", { hour: "2-digit", minute: "2-digit" })
+            : "--";
+        });
+
+        const map = key => last.map(item => item[key] ?? null);
+
+        updateOneChart(charts.temperature, labels, map("temperature_c"));
+        updateOneChart(charts.humidity, labels, map("humidity_percent"));
+        updateOneChart(charts.pressure, labels, map("pressure_hpa"));
+        updateOneChart(charts.gas, labels, map("gas_kohms"));
+        updateOneChart(charts.waterAo, labels, map("water_ao"));
+        updateOneChart(charts.waterDetected, labels, last.map(item => item.water_detected ? 1 : 0));
+      } catch (error) {
+        console.warn("Kunne ikke oppdatere kurver. Målingene vises fortsatt.", error);
       }
-
-      const last = history.slice(-120);
-
-      const labels = last.map(item => {
-        const d = parseTimestamp(item.timestamp_sweden || item.timestamp_utc || item.timestamp);
-        return d
-          ? d.toLocaleTimeString("no-NO", { hour: "2-digit", minute: "2-digit" })
-          : "--";
-      });
-
-      const map = key => last.map(item => item[key] ?? null);
-
-      charts.temperature.data.labels = labels;
-      charts.temperature.data.datasets[0].data = map("temperature_c");
-
-      charts.humidity.data.labels = labels;
-      charts.humidity.data.datasets[0].data = map("humidity_percent");
-
-      charts.pressure.data.labels = labels;
-      charts.pressure.data.datasets[0].data = map("pressure_hpa");
-
-      charts.gas.data.labels = labels;
-      charts.gas.data.datasets[0].data = map("gas_kohms");
-
-      charts.waterAo.data.labels = labels;
-      charts.waterAo.data.datasets[0].data = map("water_ao");
-
-      charts.waterDetected.data.labels = labels;
-      charts.waterDetected.data.datasets[0].data =
-        last.map(item => item.water_detected ? 1 : 0);
-
-      Object.values(charts).forEach(chart => chart.update("none"));
     }
 
     async function fetchJson(url) {
@@ -736,21 +744,18 @@
 
     async function loadData(manual = false) {
       try {
-        setTopStatus("warn", manual ? "Henter n\u00E5..." : "Henter JSON...");
+        setTopStatus("warn", manual ? "Henter nå..." : "Henter JSON...");
 
         const latest = await fetchJson(LATEST_URL);
-
         updateDashboard(latest);
 
         try {
           const history = await fetchJson(HISTORY_URL);
-
           if (Array.isArray(history) && history.length > 0) {
             updateCharts(history);
           } else {
             updateCharts([latest]);
           }
-
         } catch (historyError) {
           console.warn(
             "Kunne ikke hente history.json. Bruker latest.json som fallback.",
