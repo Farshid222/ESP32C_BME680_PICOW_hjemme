@@ -6,22 +6,64 @@
   <title>Tannlegeklinikk rom 1 – vannalarm</title>
 
   <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --ok: #34d399;
+      --bad: #fb7185;
+      --warn: #fbbf24;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       min-height: 100vh;
       font-family: Arial, sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
+      background: var(--bg);
+      color: var(--text);
       padding: 30px;
     }
 
     h1 {
       font-size: 42px;
-      margin-bottom: 10px;
+      margin: 0 0 10px;
+    }
+
+    h2 {
+      margin-top: 28px;
     }
 
     p {
-      color: #cbd5e1;
+      color: var(--muted);
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .statusBox {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px 20px;
+      min-width: 240px;
+    }
+
+    .statusText {
+      font-size: 24px;
+      font-weight: bold;
+      margin-top: 8px;
     }
 
     .grid {
@@ -32,14 +74,14 @@
     }
 
     .card {
-      background: #1e293b;
-      border: 1px solid #334155;
+      background: var(--card);
+      border: 1px solid var(--border);
       border-radius: 18px;
       padding: 20px;
     }
 
     .label {
-      color: #cbd5e1;
+      color: var(--muted);
       font-size: 15px;
       margin-bottom: 10px;
     }
@@ -47,18 +89,24 @@
     .value {
       font-size: 34px;
       font-weight: bold;
+      word-break: break-word;
+    }
+
+    .smallValue {
+      font-size: 17px;
+      word-break: break-word;
     }
 
     .ok {
-      color: #34d399;
+      color: var(--ok);
     }
 
     .bad {
-      color: #fb7185;
+      color: var(--bad);
     }
 
     .warn {
-      color: #fbbf24;
+      color: var(--warn);
     }
 
     pre {
@@ -68,6 +116,7 @@
       border-radius: 14px;
       overflow: auto;
       margin-top: 20px;
+      max-height: 360px;
     }
 
     button {
@@ -77,20 +126,43 @@
       border-radius: 12px;
       font-weight: bold;
       cursor: pointer;
-      background: #38bdf8;
+      background: var(--accent);
       color: #082f49;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+    }
+
+    .note {
+      margin-top: 12px;
+      font-size: 14px;
+      color: var(--muted);
     }
   </style>
 </head>
 
 <body>
-  <h1>Tannlegeklinikk rom 1 – vannalarm</h1>
-  <p>
-    Live dashboard. Henter data direkte fra
-    <strong>data/latest.json</strong>.
-  </p>
+  <div class="top">
+    <div>
+      <h1>Tannlegeklinikk rom 1 – vannalarm</h1>
+      <p>
+        Live dashboard. Henter data direkte fra
+        <strong>data/latest.json</strong>.
+      </p>
+      <p>
+        Siden henter automatisk ny data hvert <strong>5. minutt</strong>.
+        Trykk «Oppdater nå» for manuell kontroll.
+      </p>
+      <button onclick="loadData(true)">Oppdater nå</button>
+    </div>
 
-  <button onclick="loadData()">Oppdater nå</button>
+    <div class="statusBox">
+      <div class="label">Systemstatus</div>
+      <div id="systemStatus" class="statusText warn">Henter data...</div>
+      <div id="ageText" class="note">Alder på måling: --</div>
+    </div>
+  </div>
 
   <div class="grid">
     <div class="card">
@@ -126,22 +198,22 @@
 
     <div class="card">
       <div class="label">Sverige-tid</div>
-      <div id="timeSweden">--</div>
+      <div id="timeSweden" class="smallValue">--</div>
     </div>
 
     <div class="card">
       <div class="label">UTC-tid</div>
-      <div id="timeUtc">--</div>
+      <div id="timeUtc" class="smallValue">--</div>
     </div>
 
     <div class="card">
       <div class="label">Kilde</div>
-      <div id="source">--</div>
+      <div id="source" class="smallValue">--</div>
     </div>
 
     <div class="card">
       <div class="label">Sist hentet av siden</div>
-      <div id="frontendTime">--</div>
+      <div id="frontendTime" class="smallValue">--</div>
     </div>
   </div>
 
@@ -149,9 +221,85 @@
   <pre id="rawJson">Venter på data...</pre>
 
   <script>
-    async function loadData() {
+    const LATEST_URL = "data/latest.json";
+
+    // Beste løsning for GitHub Pages:
+    // Ikke hent hvert 30. sekund. 5 minutter er snillere mot GitHub.
+    const REFRESH_INTERVAL_MS = 300000;
+
+    // Hvis målingen er eldre enn dette, viser dashboardet "Gammel data".
+    const MAX_FRESH_AGE_MINUTES = 15;
+
+    function setText(id, value) {
+      document.getElementById(id).textContent =
+        value === null || value === undefined || value === "" ? "--" : value;
+    }
+
+    function formatNumber(value, digits = 2) {
+      if (typeof value !== "number" || Number.isNaN(value)) {
+        return "--";
+      }
+
+      return value.toFixed(digits);
+    }
+
+    function parseTime(data) {
+      const timeText = data.timestamp_sweden || data.timestamp_utc || data.timestamp;
+
+      if (!timeText) {
+        return null;
+      }
+
+      const parsed = new Date(timeText);
+
+      if (Number.isNaN(parsed.getTime())) {
+        return null;
+      }
+
+      return parsed;
+    }
+
+    function updateSystemStatus(data) {
+      const statusEl = document.getElementById("systemStatus");
+      const ageEl = document.getElementById("ageText");
+      const measuredAt = parseTime(data);
+
+      if (!measuredAt) {
+        statusEl.textContent = "Ingen tid";
+        statusEl.className = "statusText bad";
+        ageEl.textContent = "Alder på måling: ukjent";
+        return;
+      }
+
+      const ageMinutes = (Date.now() - measuredAt.getTime()) / 60000;
+
+      if (ageMinutes < -2) {
+        statusEl.textContent = "Klokkefeil";
+        statusEl.className = "statusText warn";
+        ageEl.textContent =
+          "Timestamp ligger " + Math.abs(ageMinutes).toFixed(1) + " min i fremtiden";
+        return;
+      }
+
+      if (ageMinutes <= MAX_FRESH_AGE_MINUTES) {
+        statusEl.textContent = "Fersk data";
+        statusEl.className = "statusText ok";
+      } else {
+        statusEl.textContent = "Gammel data";
+        statusEl.className = "statusText bad";
+      }
+
+      ageEl.textContent = "Alder på måling: " + ageMinutes.toFixed(1) + " minutter";
+    }
+
+    async function loadData(manual = false) {
       try {
-        const response = await fetch("data/latest.json?cacheBust=" + Date.now(), {
+        if (manual) {
+          document.getElementById("systemStatus").textContent = "Henter nå...";
+          document.getElementById("systemStatus").className = "statusText warn";
+        }
+
+        const response = await fetch(LATEST_URL + "?cacheBust=" + Date.now(), {
           cache: "no-store"
         });
 
@@ -161,23 +309,13 @@
 
         const data = await response.json();
 
-        document.getElementById("temperature").textContent =
-          data.temperature_c ?? "--";
+        setText("temperature", formatNumber(data.temperature_c, 2));
+        setText("humidity", formatNumber(data.humidity_percent, 2));
+        setText("pressure", formatNumber(data.pressure_hpa, 2));
+        setText("gas", formatNumber(data.gas_kohms, 2));
 
-        document.getElementById("humidity").textContent =
-          data.humidity_percent ?? "--";
-
-        document.getElementById("pressure").textContent =
-          data.pressure_hpa ?? "--";
-
-        document.getElementById("gas").textContent =
-          data.gas_kohms ?? "--";
-
-        document.getElementById("waterAo").textContent =
-          data.water_ao ?? "--";
-
-        document.getElementById("waterDo").textContent =
-          data.water_do ?? "--";
+        setText("waterAo", data.water_ao);
+        setText("waterDo", data.water_do);
 
         const waterStatus = document.getElementById("waterStatus");
 
@@ -202,29 +340,28 @@
           bmeStatus.className = "value bad";
         }
 
-        document.getElementById("timeSweden").textContent =
-          data.timestamp_sweden || "--";
+        setText("timeSweden", data.timestamp_sweden);
+        setText("timeUtc", data.timestamp_utc || data.timestamp);
+        setText("source", data.source);
 
-        document.getElementById("timeUtc").textContent =
-          data.timestamp_utc || data.timestamp || "--";
-
-        document.getElementById("source").textContent =
-          data.source || "--";
-
-        document.getElementById("frontendTime").textContent =
-          new Date().toLocaleString("no-NO");
+        setText("frontendTime", new Date().toLocaleString("no-NO"));
 
         document.getElementById("rawJson").textContent =
           JSON.stringify(data, null, 2);
 
+        updateSystemStatus(data);
+
       } catch (error) {
+        document.getElementById("systemStatus").textContent = "Hentefeil";
+        document.getElementById("systemStatus").className = "statusText bad";
+        document.getElementById("ageText").textContent = "Alder på måling: --";
         document.getElementById("rawJson").textContent =
           "FEIL: " + error;
       }
     }
 
-    loadData();
-    setInterval(loadData, 30000);
+    loadData(false);
+    setInterval(loadData, REFRESH_INTERVAL_MS);
   </script>
 </body>
 </html>
