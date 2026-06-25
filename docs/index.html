@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="no">
+<html lang="sv">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tannlegeklinikk rom 1 – vannalarm</title>
+  <title>Tandläkarklinik rum 1 – vattenlarm</title>
 
   <style>
     :root {
@@ -34,10 +34,6 @@
     h1 {
       font-size: 42px;
       margin: 0 0 10px;
-    }
-
-    h2 {
-      margin-top: 28px;
     }
 
     p {
@@ -109,16 +105,6 @@
       color: var(--warn);
     }
 
-    pre {
-      background: #020617;
-      color: #dbeafe;
-      padding: 16px;
-      border-radius: 14px;
-      overflow: auto;
-      margin-top: 20px;
-      max-height: 360px;
-    }
-
     button {
       margin-top: 20px;
       padding: 12px 18px;
@@ -145,22 +131,20 @@
 <body>
   <div class="top">
     <div>
-      <h1>Tannlegeklinikk rom 1 – vannalarm</h1>
+      <h1>Tandläkarklinik rum 1 – vattenlarm</h1>
       <p>
-        Live dashboard. Henter data direkte fra
-        <strong>data/latest.json</strong>.
+        Översikt för rum 1. Sidan visar senaste mätningen och varnar vid vattenläckage.
       </p>
       <p>
-        Siden henter automatisk ny data hvert <strong>5. minutt</strong>.
-        Trykk «Oppdater nå» for manuell kontroll.
+        Sidan uppdateras automatiskt var femte minut.
       </p>
-      <button onclick="loadData(true)">Oppdater nå</button>
+      <button onclick="loadData(true)">Uppdatera nu</button>
     </div>
 
     <div class="statusBox">
       <div class="label">Systemstatus</div>
-      <div id="systemStatus" class="statusText warn">Henter data...</div>
-      <div id="ageText" class="note">Alder på måling: --</div>
+      <div id="systemStatus" class="statusText warn">Hämtar data...</div>
+      <div id="ageText" class="note">Senaste mätning: --</div>
     </div>
   </div>
 
@@ -176,58 +160,40 @@
     </div>
 
     <div class="card">
-      <div class="label">Lufttrykk</div>
+      <div class="label">Lufttryck</div>
       <div class="value"><span id="pressure">--</span> hPa</div>
     </div>
 
     <div class="card">
-      <div class="label">Gassresistans</div>
-      <div class="value"><span id="gas">--</span> kΩ</div>
+      <div class="label">Luftkvalitet</div>
+      <div class="value"><span id="gas">--</span></div>
     </div>
 
     <div class="card">
-      <div class="label">Vannlekkasje</div>
+      <div class="label">Vattenläckage</div>
       <div class="value" id="waterStatus">--</div>
-      <p>AO: <span id="waterAo">--</span> | DO: <span id="waterDo">--</span></p>
     </div>
 
     <div class="card">
-      <div class="label">BME680</div>
-      <div class="value" id="bmeStatus">--</div>
+      <div class="label">Luftmätning</div>
+      <div class="value" id="airStatus">--</div>
     </div>
 
     <div class="card">
-      <div class="label">Sverige-tid</div>
+      <div class="label">Mätningens tid</div>
       <div id="timeSweden" class="smallValue">--</div>
     </div>
 
     <div class="card">
-      <div class="label">UTC-tid</div>
-      <div id="timeUtc" class="smallValue">--</div>
-    </div>
-
-    <div class="card">
-      <div class="label">Kilde</div>
-      <div id="source" class="smallValue">--</div>
-    </div>
-
-    <div class="card">
-      <div class="label">Sist hentet av siden</div>
+      <div class="label">Sidan kontrollerades</div>
       <div id="frontendTime" class="smallValue">--</div>
     </div>
   </div>
 
-  <h2>Rå JSON fra latest.json</h2>
-  <pre id="rawJson">Venter på data...</pre>
-
   <script>
     const LATEST_URL = "data/latest.json";
 
-    // Beste løsning for GitHub Pages:
-    // Ikke hent hvert 30. sekund. 5 minutter er snillere mot GitHub.
     const REFRESH_INTERVAL_MS = 300000;
-
-    // Hvis målingen er eldre enn dette, viser dashboardet "Gammel data".
     const MAX_FRESH_AGE_MINUTES = 15;
 
     function setText(id, value) {
@@ -267,35 +233,52 @@
       if (!measuredAt) {
         statusEl.textContent = "Ingen tid";
         statusEl.className = "statusText bad";
-        ageEl.textContent = "Alder på måling: ukjent";
+        ageEl.textContent = "Senaste mätning: okänd";
         return;
       }
 
       const ageMinutes = (Date.now() - measuredAt.getTime()) / 60000;
 
       if (ageMinutes < -2) {
-        statusEl.textContent = "Klokkefeil";
+        statusEl.textContent = "Tidsfel";
         statusEl.className = "statusText warn";
-        ageEl.textContent =
-          "Timestamp ligger " + Math.abs(ageMinutes).toFixed(1) + " min i fremtiden";
+        ageEl.textContent = "Senaste mätning: tidsfel";
         return;
       }
 
       if (ageMinutes <= MAX_FRESH_AGE_MINUTES) {
-        statusEl.textContent = "Fersk data";
+        statusEl.textContent = "Normal";
         statusEl.className = "statusText ok";
       } else {
-        statusEl.textContent = "Gammel data";
+        statusEl.textContent = "Gammal mätning";
         statusEl.className = "statusText bad";
       }
 
-      ageEl.textContent = "Alder på måling: " + ageMinutes.toFixed(1) + " minutter";
+      ageEl.textContent =
+        "Senaste mätning: " + ageMinutes.toFixed(1) + " minuter sedan";
+    }
+
+    function updateAirQuality(value) {
+      const gasEl = document.getElementById("gas");
+
+      if (typeof value !== "number" || Number.isNaN(value)) {
+        gasEl.textContent = "--";
+        return;
+      }
+
+      if (value < 80) {
+        gasEl.textContent = "Låg";
+      } else if (value < 200) {
+        gasEl.textContent = "Normal";
+      } else {
+        gasEl.textContent = "Hög";
+      }
     }
 
     async function loadData(manual = false) {
       try {
         if (manual) {
-          document.getElementById("systemStatus").textContent = "Henter nå...";
+          document.getElementById("systemStatus").textContent = "Uppdaterar...";
           document.getElementById("systemStatus").className = "statusText warn";
         }
 
@@ -312,51 +295,41 @@
         setText("temperature", formatNumber(data.temperature_c, 2));
         setText("humidity", formatNumber(data.humidity_percent, 2));
         setText("pressure", formatNumber(data.pressure_hpa, 2));
-        setText("gas", formatNumber(data.gas_kohms, 2));
 
-        setText("waterAo", data.water_ao);
-        setText("waterDo", data.water_do);
+        updateAirQuality(data.gas_kohms);
 
         const waterStatus = document.getElementById("waterStatus");
 
         if (data.water_detected === true) {
-          waterStatus.textContent = "LEKKASJE";
+          waterStatus.textContent = "LÄCKAGE";
           waterStatus.className = "value bad";
         } else if (data.water_detected === false) {
-          waterStatus.textContent = "Tørt";
+          waterStatus.textContent = "Torrt";
           waterStatus.className = "value ok";
         } else {
-          waterStatus.textContent = "Ukjent";
+          waterStatus.textContent = "Okänt";
           waterStatus.className = "value warn";
         }
 
-        const bmeStatus = document.getElementById("bmeStatus");
+        const airStatus = document.getElementById("airStatus");
 
         if (data.bme680_ok === true) {
-          bmeStatus.textContent = "OK";
-          bmeStatus.className = "value ok";
+          airStatus.textContent = "OK";
+          airStatus.className = "value ok";
         } else {
-          bmeStatus.textContent = "Feil";
-          bmeStatus.className = "value bad";
+          airStatus.textContent = "Fel";
+          airStatus.className = "value bad";
         }
 
         setText("timeSweden", data.timestamp_sweden);
-        setText("timeUtc", data.timestamp_utc || data.timestamp);
-        setText("source", data.source);
-
-        setText("frontendTime", new Date().toLocaleString("no-NO"));
-
-        document.getElementById("rawJson").textContent =
-          JSON.stringify(data, null, 2);
+        setText("frontendTime", new Date().toLocaleString("sv-SE"));
 
         updateSystemStatus(data);
 
       } catch (error) {
-        document.getElementById("systemStatus").textContent = "Hentefeil";
+        document.getElementById("systemStatus").textContent = "Fel vid hämtning";
         document.getElementById("systemStatus").className = "statusText bad";
-        document.getElementById("ageText").textContent = "Alder på måling: --";
-        document.getElementById("rawJson").textContent =
-          "FEIL: " + error;
+        document.getElementById("ageText").textContent = "Senaste mätning: --";
       }
     }
 
