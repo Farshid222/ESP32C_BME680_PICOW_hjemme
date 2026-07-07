@@ -6,6 +6,8 @@
 
   <title>Tandläkarklinik rum 1 – vattenlarm</title>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     :root {
       --bg: #0f172a;
@@ -26,15 +28,20 @@
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
       padding: 30px;
+      font-family: Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
     }
 
     h1 {
-      font-size: 42px;
       margin: 0 0 10px;
+      font-size: 42px;
+    }
+
+    h2 {
+      margin: 38px 0 8px;
+      font-size: 28px;
     }
 
     p {
@@ -43,24 +50,24 @@
 
     .top {
       display: flex;
-      justify-content: space-between;
       align-items: flex-start;
+      justify-content: space-between;
       gap: 20px;
       flex-wrap: wrap;
     }
 
     .statusBox {
+      min-width: 240px;
+      padding: 16px 20px;
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 18px;
-      padding: 16px 20px;
-      min-width: 240px;
     }
 
     .statusText {
+      margin-top: 8px;
       font-size: 24px;
       font-weight: bold;
-      margin-top: 8px;
     }
 
     .grid {
@@ -71,20 +78,20 @@
     }
 
     .card {
+      padding: 20px;
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 18px;
-      padding: 20px;
       transition:
         background-color 0.25s ease,
-        color 0.25s ease,
-        border-color 0.25s ease;
+        border-color 0.25s ease,
+        color 0.25s ease;
     }
 
     .label {
+      margin-bottom: 10px;
       color: var(--muted);
       font-size: 15px;
-      margin-bottom: 10px;
     }
 
     .value {
@@ -113,12 +120,12 @@
     button {
       margin-top: 20px;
       padding: 12px 18px;
-      border: 0;
-      border-radius: 12px;
+      color: #082f49;
       font-weight: bold;
       cursor: pointer;
       background: var(--accent);
-      color: #082f49;
+      border: 0;
+      border-radius: 12px;
     }
 
     button:hover {
@@ -127,12 +134,8 @@
 
     .note {
       margin-top: 12px;
-      font-size: 14px;
       color: var(--muted);
-    }
-
-    .iaq-card {
-      background: var(--card);
+      font-size: 14px;
     }
 
     .iaq-card .label {
@@ -158,6 +161,70 @@
       font-weight: bold;
       opacity: 0.85;
     }
+
+    .history-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    #historyStatus {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 18px;
+      margin-top: 20px;
+    }
+
+    .chart-card {
+      min-height: 340px;
+      padding: 18px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+    }
+
+    .chart-title {
+      margin-bottom: 14px;
+      color: var(--text);
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 270px;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 18px;
+      }
+
+      h1 {
+        font-size: 32px;
+      }
+
+      .chart-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-card {
+        min-height: 310px;
+      }
+
+      .chart-container {
+        height: 240px;
+      }
+    }
   </style>
 </head>
 
@@ -175,7 +242,7 @@
         Sidan uppdateras automatiskt var femte minut.
       </p>
 
-      <button type="button" onclick="loadData(true)">
+      <button type="button" onclick="loadAllData(true)">
         Uppdatera nu
       </button>
     </div>
@@ -196,7 +263,6 @@
   <div class="grid">
     <div class="card">
       <div class="label">Temperatur</div>
-
       <div class="value">
         <span id="temperature">--</span> °C
       </div>
@@ -204,7 +270,6 @@
 
     <div class="card">
       <div class="label">Luftfuktighet</div>
-
       <div class="value">
         <span id="humidity">--</span> %
       </div>
@@ -212,7 +277,6 @@
 
     <div class="card">
       <div class="label">Lufttryck</div>
-
       <div class="value">
         <span id="pressure">--</span> hPa
       </div>
@@ -236,23 +300,20 @@
 
     <div class="card">
       <div class="label">Vattenläckage</div>
-
-      <div class="value" id="waterStatus">
+      <div id="waterStatus" class="value">
         --
       </div>
     </div>
 
     <div class="card">
       <div class="label">Luftmätning</div>
-
-      <div class="value" id="airStatus">
+      <div id="airStatus" class="value">
         --
       </div>
     </div>
 
     <div class="card">
       <div class="label">Mätningens tid</div>
-
       <div id="timeSweden" class="smallValue">
         --
       </div>
@@ -260,18 +321,65 @@
 
     <div class="card">
       <div class="label">Sidan kontrollerades</div>
-
       <div id="frontendTime" class="smallValue">
         --
       </div>
     </div>
   </div>
 
+  <div class="history-header">
+    <div>
+      <h2>Historik</h2>
+      <p>Kurvor från sparade historikmätningar.</p>
+    </div>
+
+    <div id="historyStatus">
+      Hämtar historik...
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">Temperatur °C</div>
+      <div class="chart-container">
+        <canvas id="temperatureChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Luftfuktighet %</div>
+      <div class="chart-container">
+        <canvas id="humidityChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Lufttryck hPa</div>
+      <div class="chart-container">
+        <canvas id="pressureChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Luftkvalitet IAQ</div>
+      <div class="chart-container">
+        <canvas id="iaqChart"></canvas>
+      </div>
+    </div>
+  </div>
+
   <script>
     const LATEST_URL = "data/latest.json";
+    const HISTORY_URL = "data/history.json";
 
     const REFRESH_INTERVAL_MS = 300000;
     const MAX_FRESH_AGE_MINUTES = 15;
+    const MAX_HISTORY_POINTS = 300;
+
+    let temperatureChart = null;
+    let humidityChart = null;
+    let pressureChart = null;
+    let iaqChart = null;
 
     function setText(id, value) {
       const element = document.getElementById(id);
@@ -284,21 +392,45 @@
           : value;
     }
 
-    function formatNumber(value, digits = 2) {
+    function toNumber(value) {
+      if (
+        value === null ||
+        value === undefined ||
+        value === ""
+      ) {
+        return null;
+      }
+
       const number = Number(value);
 
-      if (!Number.isFinite(number)) {
+      return Number.isFinite(number)
+        ? number
+        : null;
+    }
+
+    function formatNumber(value, digits = 2) {
+      const number = toNumber(value);
+
+      if (number === null) {
         return "--";
       }
 
       return number.toFixed(digits);
     }
 
-    function parseTime(data) {
-      const timeText =
+    function getTimestampText(data) {
+      return (
         data.timestamp_sweden ||
         data.timestamp_utc ||
-        data.timestamp;
+        data.timestamp ||
+        data.time ||
+        data.datetime ||
+        null
+      );
+    }
+
+    function parseTime(data) {
+      const timeText = getTimestampText(data);
 
       if (!timeText) {
         return null;
@@ -313,9 +445,22 @@
       return parsed;
     }
 
+    function formatChartTime(date) {
+      return date.toLocaleString("sv-SE", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    }
+
     function updateSystemStatus(data) {
-      const statusEl = document.getElementById("systemStatus");
-      const ageEl = document.getElementById("ageText");
+      const statusEl =
+        document.getElementById("systemStatus");
+
+      const ageEl =
+        document.getElementById("ageText");
+
       const measuredAt = parseTime(data);
 
       if (!measuredAt) {
@@ -415,34 +560,58 @@
     }
 
     function updateAirQuality(value) {
-      const card = document.getElementById("airQualityCard");
-      const valueEl = document.getElementById("iaqValue");
+      const card =
+        document.getElementById("airQualityCard");
+
+      const valueEl =
+        document.getElementById("iaqValue");
+
       const descriptionEl =
         document.getElementById("iaqDescription");
-      const rangeEl = document.getElementById("iaqRange");
 
-      const numericValue = Number(value);
+      const rangeEl =
+        document.getElementById("iaqRange");
 
-      if (!Number.isFinite(numericValue)) {
+      const numericValue = toNumber(value);
+
+      if (numericValue === null) {
         valueEl.textContent = "--";
-        descriptionEl.textContent = "Ingen IAQ-mätning";
+        descriptionEl.textContent =
+          "Ingen IAQ-mätning";
         rangeEl.textContent = "IAQ 0–500";
 
-        card.style.backgroundColor = "var(--card)";
-        card.style.color = "var(--text)";
-        card.style.borderColor = "var(--border)";
+        card.style.backgroundColor =
+          "var(--card)";
+
+        card.style.color =
+          "var(--text)";
+
+        card.style.borderColor =
+          "var(--border)";
+
         return;
       }
 
-      const status = getIaqClassification(numericValue);
+      const status =
+        getIaqClassification(numericValue);
 
-      valueEl.textContent = status.value;
-      descriptionEl.textContent = status.text;
-      rangeEl.textContent = status.range;
+      valueEl.textContent =
+        status.value;
 
-      card.style.backgroundColor = status.background;
-      card.style.color = status.foreground;
-      card.style.borderColor = status.background;
+      descriptionEl.textContent =
+        status.text;
+
+      rangeEl.textContent =
+        status.range;
+
+      card.style.backgroundColor =
+        status.background;
+
+      card.style.color =
+        status.foreground;
+
+      card.style.borderColor =
+        status.background;
     }
 
     function updateWaterStatus(data) {
@@ -477,14 +646,17 @@
       }
     }
 
-    async function loadData(manual = false) {
-      try {
-        const statusElement =
-          document.getElementById("systemStatus");
+    async function loadLatestData(manual = false) {
+      const statusElement =
+        document.getElementById("systemStatus");
 
+      try {
         if (manual) {
-          statusElement.textContent = "Uppdaterar...";
-          statusElement.className = "statusText warn";
+          statusElement.textContent =
+            "Uppdaterar...";
+
+          statusElement.className =
+            "statusText warn";
         }
 
         const response = await fetch(
@@ -520,26 +692,13 @@
           formatNumber(data.pressure_hpa, 2)
         );
 
-        /*
-          Viktig:
-          Luftkvalitetskortet använder data.iaq.
-
-          Exempel i latest.json:
-          "iaq": 72
-
-          gas_kohms används inte som IAQ eftersom
-          gasmotstånd och IAQ är två olika värden.
-        */
         updateAirQuality(data.iaq);
-
         updateWaterStatus(data);
         updateAirSensorStatus(data);
 
         setText(
           "timeSweden",
-          data.timestamp_sweden ||
-          data.timestamp_utc ||
-          data.timestamp
+          getTimestampText(data)
         );
 
         setText(
@@ -550,32 +709,368 @@
         updateSystemStatus(data);
 
       } catch (error) {
-        console.error("Fel vid hämtning:", error);
+        console.error(
+          "Fel vid hämtning av senaste data:",
+          error
+        );
 
-        document.getElementById(
-          "systemStatus"
-        ).textContent = "Fel vid hämtning";
+        statusElement.textContent =
+          "Fel vid hämtning";
 
-        document.getElementById(
-          "systemStatus"
-        ).className = "statusText bad";
+        statusElement.className =
+          "statusText bad";
 
         document.getElementById(
           "ageText"
-        ).textContent = "Senaste mätning: --";
+        ).textContent =
+          "Senaste mätning: --";
 
         updateAirQuality(null);
       }
     }
 
-    loadData(false);
+    function extractHistoryArray(json) {
+      if (Array.isArray(json)) {
+        return json;
+      }
 
-    setInterval(
-      function () {
-        loadData(false);
-      },
-      REFRESH_INTERVAL_MS
-    );
+      if (
+        !json ||
+        typeof json !== "object"
+      ) {
+        return [];
+      }
+
+      const possibleKeys = [
+        "history",
+        "data",
+        "readings",
+        "measurements",
+        "items"
+      ];
+
+      for (const key of possibleKeys) {
+        if (Array.isArray(json[key])) {
+          return json[key];
+        }
+      }
+
+      return [];
+    }
+
+    function prepareHistory(historyJson) {
+      const rows =
+        extractHistoryArray(historyJson);
+
+      return rows
+        .map(function (row) {
+          const time = parseTime(row);
+
+          if (!time) {
+            return null;
+          }
+
+          return {
+            time: time,
+            label: formatChartTime(time),
+            temperature:
+              toNumber(row.temperature_c),
+            humidity:
+              toNumber(row.humidity_percent),
+            pressure:
+              toNumber(row.pressure_hpa),
+            iaq:
+              toNumber(row.iaq)
+          };
+        })
+        .filter(function (row) {
+          return row !== null;
+        })
+        .sort(function (a, b) {
+          return (
+            a.time.getTime() -
+            b.time.getTime()
+          );
+        })
+        .slice(-MAX_HISTORY_POINTS);
+    }
+
+    function chartOptions(
+      unit,
+      suggestedMin,
+      suggestedMax
+    ) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+
+        interaction: {
+          mode: "index",
+          intersect: false
+        },
+
+        plugins: {
+          legend: {
+            display: false
+          },
+
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                if (
+                  context.parsed.y === null
+                ) {
+                  return "Ingen mätning";
+                }
+
+                return (
+                  context.parsed.y +
+                  " " +
+                  unit
+                );
+              }
+            }
+          }
+        },
+
+        scales: {
+          x: {
+            ticks: {
+              color: "#cbd5e1",
+              maxTicksLimit: 8,
+              maxRotation: 0
+            },
+
+            grid: {
+              color:
+                "rgba(148, 163, 184, 0.12)"
+            }
+          },
+
+          y: {
+            suggestedMin:
+              suggestedMin,
+
+            suggestedMax:
+              suggestedMax,
+
+            ticks: {
+              color: "#cbd5e1"
+            },
+
+            grid: {
+              color:
+                "rgba(148, 163, 184, 0.15)"
+            }
+          }
+        }
+      };
+    }
+
+    function createOrUpdateChart(
+      existingChart,
+      canvasId,
+      labels,
+      values,
+      datasetLabel,
+      unit,
+      suggestedMin,
+      suggestedMax
+    ) {
+      if (existingChart) {
+        existingChart.data.labels =
+          labels;
+
+        existingChart.data.datasets[0].data =
+          values;
+
+        existingChart.update();
+
+        return existingChart;
+      }
+
+      const canvas =
+        document.getElementById(canvasId);
+
+      return new Chart(canvas, {
+        type: "line",
+
+        data: {
+          labels: labels,
+
+          datasets: [
+            {
+              label: datasetLabel,
+              data: values,
+              borderWidth: 2,
+              pointRadius:
+                labels.length > 100 ? 0 : 2,
+              pointHoverRadius: 5,
+              tension: 0.2,
+              spanGaps: true
+            }
+          ]
+        },
+
+        options: chartOptions(
+          unit,
+          suggestedMin,
+          suggestedMax
+        )
+      });
+    }
+
+    async function loadHistoryData() {
+      const historyStatus =
+        document.getElementById(
+          "historyStatus"
+        );
+
+      try {
+        historyStatus.textContent =
+          "Hämtar historik...";
+
+        const response = await fetch(
+          HISTORY_URL +
+          "?cacheBust=" +
+          Date.now(),
+          {
+            cache: "no-store"
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            "HTTP " +
+            response.status +
+            " " +
+            response.statusText
+          );
+        }
+
+        const historyJson =
+          await response.json();
+
+        const rows =
+          prepareHistory(historyJson);
+
+        if (rows.length === 0) {
+          historyStatus.textContent =
+            "Ingen giltig historik hittades.";
+
+          return;
+        }
+
+        const labels =
+          rows.map(function (row) {
+            return row.label;
+          });
+
+        const temperatures =
+          rows.map(function (row) {
+            return row.temperature;
+          });
+
+        const humidities =
+          rows.map(function (row) {
+            return row.humidity;
+          });
+
+        const pressures =
+          rows.map(function (row) {
+            return row.pressure;
+          });
+
+        const iaqValues =
+          rows.map(function (row) {
+            return row.iaq;
+          });
+
+        temperatureChart =
+          createOrUpdateChart(
+            temperatureChart,
+            "temperatureChart",
+            labels,
+            temperatures,
+            "Temperatur",
+            "°C"
+          );
+
+        humidityChart =
+          createOrUpdateChart(
+            humidityChart,
+            "humidityChart",
+            labels,
+            humidities,
+            "Luftfuktighet",
+            "%",
+            0,
+            100
+          );
+
+        pressureChart =
+          createOrUpdateChart(
+            pressureChart,
+            "pressureChart",
+            labels,
+            pressures,
+            "Lufttryck",
+            "hPa"
+          );
+
+        iaqChart =
+          createOrUpdateChart(
+            iaqChart,
+            "iaqChart",
+            labels,
+            iaqValues,
+            "Luftkvalitet",
+            "IAQ",
+            0,
+            500
+          );
+
+        const firstTime =
+          rows[0].time.toLocaleString("sv-SE");
+
+        const lastTime =
+          rows[
+            rows.length - 1
+          ].time.toLocaleString("sv-SE");
+
+        historyStatus.textContent =
+          rows.length +
+          " mätningar visas. " +
+          firstTime +
+          " – " +
+          lastTime;
+
+      } catch (error) {
+        console.error(
+          "Fel vid hämtning av historik:",
+          error
+        );
+
+        historyStatus.textContent =
+          "Historik kunde inte hämtas.";
+      }
+    }
+
+    async function loadAllData(
+      manual = false
+    ) {
+      await Promise.all([
+        loadLatestData(manual),
+        loadHistoryData()
+      ]);
+    }
+
+    loadAllData(false);
+
+    setInterval(function () {
+      loadAllData(false);
+    }, REFRESH_INTERVAL_MS);
   </script>
 </body>
 </html>
