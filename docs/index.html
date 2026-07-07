@@ -1,926 +1,1076 @@
-from machine import UART, Pin
-import network
-import time
-import urequests
-import ujson
-import ubinascii
-import ntptime
-
-from secrets_hjemme import (
-    WIFI_SSID,
-    WIFI_PASSWORD,
-    GITHUB_TOKEN,
-    GITHUB_OWNER,
-    GITHUB_REPO,
-    GITHUB_BRANCH,
-    GITHUB_FILE_PATH,
-    TELEGRAM_BOT_TOKEN,
-    TELEGRAM_CHAT_IDS,
-)
-
-# =====================================================
-# Pico W / Pico 2 W main.py
-# Mottar data fra ESP32-C3 via UART
-# Oppdaterer GitHub latest.json og history.json
-# Sender Telegram-varsel ved vannlekkasje
-# =====================================================
-#
-# UART-kobling:
-# ESP32-C3 GPIO21 TX -> Pico W GP1 RX
-# ESP32-C3 GND       -> Pico W GND
-#
-# GitHub:
-# data/latest.json
-# data/history.json
-#
-# Tid:
-# timestamp         = UTC
-# timestamp_utc     = UTC
-# timestamp_sweden  = svensk tid, Europe/Stockholm
-#
-# Telegram:
-# Sendes først ved alarm og normal/tørr.
-# GitHub-opplasting skjer etter Telegram.
-#
-# Kamera er fjernet.
-
-uart = UART(0, baudrate=9600, tx=Pin(0), rx=Pin(1))
-led = Pin("LED", Pin.OUT)
-
-UPLOAD_INTERVAL_MS = 60000
-
-# BME680-overvåking på Pico.
-# Pico kan ikke fysisk reinitialisere BME680 fordi sensoren er koblet til
-# ESP32-C3. Pico registrerer derfor feil, varsler via Telegram og fortsetter
-# vannlekkasjeovervåkingen.
-BME_FAILURE_CONFIRM_MS = 120000
-
-# GITHUB_HISTORY_FILE_PATH = "data/history.json"
-GITHUB_HISTORY_FILE_PATH = "docs/data/history.json"
-
-MAX_HISTORY_ITEMS = 120
-
-buffer = b""
-latest_measurement = None
-
-last_upload_ms = 0
-first_upload_done = False
-
-previous_water_detected = False
-alarm_sent_for_current_leak = False
-
-bme_failure_started_ms = None
-bme_failure_alert_sent = False
-
-
-def connect_wifi():
-    wlan = network.WLAN(network.STA_IF)
-    wlan.active(True)
-
-    if wlan.isconnected():
-        return True
-
-    print("Kobler til Wi-Fi...")
-    wlan.connect(WIFI_SSID, WIFI_PASSWORD)
-
-    for i in range(30):
-        if wlan.isconnected():
-            print()
-            print("Wi-Fi tilkoblet")
-            print("IP:", wlan.ifconfig()[0])
-            return True
-
-        print(".", end="")
-        time.sleep(1)
-
-    print()
-    print("FEIL: Kunne ikke koble til Wi-Fi")
-    return False
-
-
-def time_is_valid():
-    """
-    Pico viser ofte 2021 hvis NTP ikke har fungert.
-    Vi godtar bare tid fra 2024 og nyere.
-    """
-    try:
-        return time.localtime()[0] >= 2024
-    except Exception:
-        return False
-
-
-def sync_time(max_attempts=10):
-    """
-    Prøver å synkronisere tid med NTP flere ganger.
-    Returnerer True hvis tiden ble riktig, ellers False.
-    """
-    ntptime.host = "pool.ntp.org"
-
-    for attempt in range(1, max_attempts + 1):
-        try:
-            print("Prøver NTP-synkronisering, forsøk", attempt, "av", max_attempts)
-
-            ntptime.settime()
-            time.sleep(1)
-
-            year = time.localtime()[0]
-
-            if year >= 2024:
-                print("Tid synkronisert med NTP")
-                print("År:", year)
-                return True
-            else:
-                print("NTP ga feil/gammel tid. År:", year)
-
-        except Exception as e:
-            print("NTP-feil på forsøk", attempt, ":", e)
-
-        time.sleep(3)
-
-    print("FEIL: Klarte ikke å synkronisere tid med NTP")
-    return False
-
-
-def is_swedish_summer_time(year, month, day, hour_utc):
-    """
-    Sverige bruker:
-    - CET  = UTC+1 om vinteren
-    - CEST = UTC+2 om sommeren
-
-    Sommertid i EU:
-    Fra siste søndag i mars kl. 01:00 UTC
-    Til siste søndag i oktober kl. 01:00 UTC
-    """
-
-    def last_sunday(year, month):
-        if month == 12:
-            next_year = year + 1
-            next_month = 1
-        else:
-            next_year = year
-            next_month = month + 1
-
-        next_month_start = time.mktime((next_year, next_month, 1, 0, 0, 0, 0, 0))
-        last_day_seconds = next_month_start - 24 * 60 * 60
-        last = time.localtime(last_day_seconds)
-
-        last_day = last[2]
-        weekday = last[6]  # Monday=0, Sunday=6
-
-        return last_day - ((weekday + 1) % 7)
-
-    march_last_sunday = last_sunday(year, 3)
-    october_last_sunday = last_sunday(year, 10)
-
-    if month < 3 or month > 10:
-        return False
-
-    if month > 3 and month < 10:
-        return True
-
-    if month == 3:
-        if day > march_last_sunday:
-            return True
-        if day == march_last_sunday and hour_utc >= 1:
-            return True
-        return False
-
-    if month == 10:
-        if day < october_last_sunday:
-            return True
-        if day == october_last_sunday and hour_utc < 1:
-            return True
-        return False
-
-    return False
-
-
-def ensure_valid_time():
-    """
-    Sørger for at tiden er riktig før vi lager timestamp.
-    Hvis tiden ikke er gyldig, prøver den NTP igjen.
-    """
-
-    if time_is_valid():
-        return True
-
-    print("ADVARSEL: Tid er ikke gyldig. Prøver NTP igjen.")
-
-    if connect_wifi():
-        return sync_time(max_attempts=5)
-
-    return False
-
-
-def now_utc_iso():
-    """
-    UTC-tid. Denne skal ha Z på slutten.
-    """
-
-    ensure_valid_time()
-
-    t = time.localtime()
-
-    return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}Z".format(
-        t[0], t[1], t[2], t[3], t[4], t[5]
-    )
-
-
-def now_sweden_iso():
-    """
-    Svensk tid:
-    - UTC+1 vintertid
-    - UTC+2 sommertid
-
-    Returnerer tid med +01:00 eller +02:00.
-    """
-
-    ensure_valid_time()
-
-    utc = time.localtime()
-
-    year = utc[0]
-    month = utc[1]
-    day = utc[2]
-    hour = utc[3]
-
-    summer = is_swedish_summer_time(year, month, day, hour)
-
-    if summer:
-        offset_hours = 2
-        offset_text = "+02:00"
-    else:
-        offset_hours = 1
-        offset_text = "+01:00"
-
-    swedish_seconds = time.mktime(utc) + offset_hours * 60 * 60
-    swedish = time.localtime(swedish_seconds)
-
-    return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}{}".format(
-        swedish[0],
-        swedish[1],
-        swedish[2],
-        swedish[3],
-        swedish[4],
-        swedish[5],
-        offset_text
-    )
-
-
-def now_iso():
-    """
-    Beholder gammel funksjon.
-    Den returnerer UTC.
-    """
-    return now_utc_iso()
-
-
-def github_api_url(file_path):
-    return "https://api.github.com/repos/{}/{}/contents/{}".format(
-        GITHUB_OWNER,
-        GITHUB_REPO,
-        file_path
-    )
-
-
-def github_headers():
-    return {
-        "Authorization": "Bearer " + GITHUB_TOKEN,
-        "Accept": "application/vnd.github+json",
-        "Content-Type": "application/json",
-        "User-Agent": "pico-w-bme680-water-home",
-        "X-GitHub-Api-Version": "2022-11-28",
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Tandläkarklinik rum 1 – vattenlarm</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --ok: #34d399;
+      --bad: #fb7185;
+      --warn: #fbbf24;
+      --accent: #38bdf8;
     }
 
-
-def get_github_file(file_path):
-    url = github_api_url(file_path) + "?ref=" + GITHUB_BRANCH
-
-    try:
-        response = urequests.get(url, headers=github_headers())
-        status = response.status_code
-
-        if status == 200:
-            data = response.json()
-            response.close()
-
-            sha = data.get("sha")
-            content = data.get("content", "")
-
-            content_clean = content.replace("\n", "")
-            decoded = ubinascii.a2b_base64(content_clean.encode("utf-8"))
-            text = decoded.decode("utf-8")
-
-            return {
-                "sha": sha,
-                "text": text
-            }
-
-        if status == 404:
-            response.close()
-            return {
-                "sha": None,
-                "text": None
-            }
-
-        print("Kunne ikke hente fil:", file_path)
-        print("Status:", status)
-
-        try:
-            print(response.text)
-        except Exception:
-            pass
-
-        response.close()
-
-        return {
-            "sha": None,
-            "text": None
-        }
-
-    except Exception as e:
-        print("Feil ved henting av fil:", file_path, e)
-        return {
-            "sha": None,
-            "text": None
-        }
-
-
-def upload_json_file(file_path, json_object, commit_message):
-    file_info = get_github_file(file_path)
-    sha = file_info.get("sha")
-
-    json_text = ujson.dumps(json_object)
-
-    encoded_content = ubinascii.b2a_base64(
-        json_text.encode("utf-8")
-    ).decode("utf-8").strip()
-
-    github_payload = {
-        "message": commit_message,
-        "content": encoded_content,
-        "branch": GITHUB_BRANCH,
+    * {
+      box-sizing: border-box;
     }
 
-    if sha:
-        github_payload["sha"] = sha
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 30px;
+      font-family: Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
 
-    try:
-        response = urequests.put(
-            github_api_url(file_path),
-            headers=github_headers(),
-            data=ujson.dumps(github_payload)
+    h1 {
+      margin: 0 0 10px;
+      font-size: 42px;
+    }
+
+    h2 {
+      margin: 38px 0 8px;
+      font-size: 28px;
+    }
+
+    p {
+      color: var(--muted);
+    }
+
+    .top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .statusBox {
+      min-width: 240px;
+      padding: 16px 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+    }
+
+    .statusText {
+      margin-top: 8px;
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 25px;
+    }
+
+    .card {
+      padding: 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      transition:
+        background-color 0.25s ease,
+        border-color 0.25s ease,
+        color 0.25s ease;
+    }
+
+    .label {
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .value {
+      font-size: 34px;
+      font-weight: bold;
+      word-break: break-word;
+    }
+
+    .smallValue {
+      font-size: 17px;
+      word-break: break-word;
+    }
+
+    .ok {
+      color: var(--ok);
+    }
+
+    .bad {
+      color: var(--bad);
+    }
+
+    .warn {
+      color: var(--warn);
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 12px 18px;
+      color: #082f49;
+      font-weight: bold;
+      cursor: pointer;
+      background: var(--accent);
+      border: 0;
+      border-radius: 12px;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+    }
+
+    .note {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .iaq-card .label {
+      color: inherit;
+      opacity: 0.85;
+    }
+
+    .iaq-number {
+      font-size: 42px;
+      font-weight: bold;
+      line-height: 1.1;
+    }
+
+    .iaq-description {
+      margin-top: 8px;
+      font-size: 21px;
+      font-weight: bold;
+    }
+
+    .iaq-range {
+      margin-top: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      opacity: 0.85;
+    }
+
+    .history-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    #historyStatus {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 18px;
+      margin-top: 20px;
+    }
+
+    .chart-card {
+      min-height: 340px;
+      padding: 18px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+    }
+
+    .chart-title {
+      margin-bottom: 14px;
+      color: var(--text);
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 270px;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 18px;
+      }
+
+      h1 {
+        font-size: 32px;
+      }
+
+      .chart-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-card {
+        min-height: 310px;
+      }
+
+      .chart-container {
+        height: 240px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="top">
+    <div>
+      <h1>Tandläkarklinik rum 1 – vattenlarm</h1>
+
+      <p>
+        Översikt för rum 1. Sidan visar senaste mätningen och varnar vid
+        vattenläckage.
+      </p>
+
+      <p>
+        Sidan uppdateras automatiskt var femte minut.
+      </p>
+
+      <button type="button" onclick="loadAllData(true)">
+        Uppdatera nu
+      </button>
+    </div>
+
+    <div class="statusBox">
+      <div class="label">Systemstatus</div>
+
+      <div id="systemStatus" class="statusText warn">
+        Hämtar data...
+      </div>
+
+      <div id="ageText" class="note">
+        Senaste mätning: --
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="label">Temperatur</div>
+      <div class="value">
+        <span id="temperature">--</span> °C
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Luftfuktighet</div>
+      <div class="value">
+        <span id="humidity">--</span> %
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Lufttryck</div>
+      <div class="value">
+        <span id="pressure">--</span> hPa
+      </div>
+    </div>
+
+    <div id="airQualityCard" class="card iaq-card">
+      <div class="label">Luftkvalitet</div>
+
+      <div id="iaqValue" class="iaq-number">
+        --
+      </div>
+
+      <div id="iaqDescription" class="iaq-description">
+        Ingen IAQ-mätning
+      </div>
+
+      <div id="iaqRange" class="iaq-range">
+        IAQ 0–500
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Vattenläckage</div>
+      <div id="waterStatus" class="value">
+        --
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Luftmätning</div>
+      <div id="airStatus" class="value">
+        --
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Mätningens tid</div>
+      <div id="timeSweden" class="smallValue">
+        --
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Sidan kontrollerades</div>
+      <div id="frontendTime" class="smallValue">
+        --
+      </div>
+    </div>
+  </div>
+
+  <div class="history-header">
+    <div>
+      <h2>Historik</h2>
+      <p>Kurvor från sparade historikmätningar.</p>
+    </div>
+
+    <div id="historyStatus">
+      Hämtar historik...
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">Temperatur °C</div>
+      <div class="chart-container">
+        <canvas id="temperatureChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Luftfuktighet %</div>
+      <div class="chart-container">
+        <canvas id="humidityChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Lufttryck hPa</div>
+      <div class="chart-container">
+        <canvas id="pressureChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Luftkvalitet IAQ</div>
+      <div class="chart-container">
+        <canvas id="iaqChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const LATEST_URL = "data/latest.json";
+    const HISTORY_URL = "data/history.json";
+
+    const REFRESH_INTERVAL_MS = 300000;
+    const MAX_FRESH_AGE_MINUTES = 15;
+    const MAX_HISTORY_POINTS = 300;
+
+    let temperatureChart = null;
+    let humidityChart = null;
+    let pressureChart = null;
+    let iaqChart = null;
+
+    function setText(id, value) {
+      const element = document.getElementById(id);
+
+      element.textContent =
+        value === null ||
+        value === undefined ||
+        value === ""
+          ? "--"
+          : value;
+    }
+
+    function toNumber(value) {
+      if (
+        value === null ||
+        value === undefined ||
+        value === ""
+      ) {
+        return null;
+      }
+
+      const number = Number(value);
+
+      return Number.isFinite(number)
+        ? number
+        : null;
+    }
+
+    function formatNumber(value, digits = 2) {
+      const number = toNumber(value);
+
+      if (number === null) {
+        return "--";
+      }
+
+      return number.toFixed(digits);
+    }
+
+    function getTimestampText(data) {
+      return (
+        data.timestamp_sweden ||
+        data.timestamp_utc ||
+        data.timestamp ||
+        data.time ||
+        data.datetime ||
+        null
+      );
+    }
+
+    function parseTime(data) {
+      const timeText = getTimestampText(data);
+
+      if (!timeText) {
+        return null;
+      }
+
+      const parsed = new Date(timeText);
+
+      if (Number.isNaN(parsed.getTime())) {
+        return null;
+      }
+
+      return parsed;
+    }
+
+    function formatChartTime(date) {
+      return date.toLocaleString("sv-SE", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    }
+
+    function updateSystemStatus(data) {
+      const statusEl =
+        document.getElementById("systemStatus");
+
+      const ageEl =
+        document.getElementById("ageText");
+
+      const measuredAt = parseTime(data);
+
+      if (!measuredAt) {
+        statusEl.textContent = "Ingen tid";
+        statusEl.className = "statusText bad";
+        ageEl.textContent = "Senaste mätning: okänd";
+        return;
+      }
+
+      const ageMinutes =
+        (Date.now() - measuredAt.getTime()) / 60000;
+
+      if (ageMinutes < -2) {
+        statusEl.textContent = "Tidsfel";
+        statusEl.className = "statusText warn";
+        ageEl.textContent = "Senaste mätning: tidsfel";
+        return;
+      }
+
+      if (ageMinutes <= MAX_FRESH_AGE_MINUTES) {
+        statusEl.textContent = "Normal";
+        statusEl.className = "statusText ok";
+      } else {
+        statusEl.textContent = "Gammal mätning";
+        statusEl.className = "statusText bad";
+      }
+
+      ageEl.textContent =
+        "Senaste mätning: " +
+        Math.max(0, ageMinutes).toFixed(1) +
+        " minuter sedan";
+    }
+
+    function getIaqClassification(value) {
+      const iaq = Math.max(
+        0,
+        Math.min(500, Math.round(Number(value)))
+      );
+
+      if (iaq <= 50) {
+        return {
+          value: iaq,
+          text: "Bra",
+          range: "IAQ 0–50",
+          background: "#00e600",
+          foreground: "#000000"
+        };
+      }
+
+      if (iaq <= 100) {
+        return {
+          value: iaq,
+          text: "Genomsnittlig",
+          range: "IAQ 51–100",
+          background: "#ffff00",
+          foreground: "#000000"
+        };
+      }
+
+      if (iaq <= 150) {
+        return {
+          value: iaq,
+          text: "Lite dålig",
+          range: "IAQ 101–150",
+          background: "#ff8000",
+          foreground: "#000000"
+        };
+      }
+
+      if (iaq <= 200) {
+        return {
+          value: iaq,
+          text: "Dålig",
+          range: "IAQ 151–200",
+          background: "#ff0000",
+          foreground: "#000000"
+        };
+      }
+
+      if (iaq <= 300) {
+        return {
+          value: iaq,
+          text: "Sämre",
+          range: "IAQ 201–300",
+          background: "#9c0050",
+          foreground: "#ffffff"
+        };
+      }
+
+      return {
+        value: iaq,
+        text: "Mycket dålig",
+        range: "IAQ 301–500",
+        background: "#000000",
+        foreground: "#ffffff"
+      };
+    }
+
+    function updateAirQuality(value) {
+      const card =
+        document.getElementById("airQualityCard");
+
+      const valueEl =
+        document.getElementById("iaqValue");
+
+      const descriptionEl =
+        document.getElementById("iaqDescription");
+
+      const rangeEl =
+        document.getElementById("iaqRange");
+
+      const numericValue = toNumber(value);
+
+      if (numericValue === null) {
+        valueEl.textContent = "--";
+        descriptionEl.textContent =
+          "Ingen IAQ-mätning";
+        rangeEl.textContent = "IAQ 0–500";
+
+        card.style.backgroundColor =
+          "var(--card)";
+
+        card.style.color =
+          "var(--text)";
+
+        card.style.borderColor =
+          "var(--border)";
+
+        return;
+      }
+
+      const status =
+        getIaqClassification(numericValue);
+
+      valueEl.textContent =
+        status.value;
+
+      descriptionEl.textContent =
+        status.text;
+
+      rangeEl.textContent =
+        status.range;
+
+      card.style.backgroundColor =
+        status.background;
+
+      card.style.color =
+        status.foreground;
+
+      card.style.borderColor =
+        status.background;
+    }
+
+    function updateWaterStatus(data) {
+      const waterStatus =
+        document.getElementById("waterStatus");
+
+      if (data.water_detected === true) {
+        waterStatus.textContent = "LÄCKAGE";
+        waterStatus.className = "value bad";
+      } else if (data.water_detected === false) {
+        waterStatus.textContent = "Torrt";
+        waterStatus.className = "value ok";
+      } else {
+        waterStatus.textContent = "Okänt";
+        waterStatus.className = "value warn";
+      }
+    }
+
+    function updateAirSensorStatus(data) {
+      const airStatus =
+        document.getElementById("airStatus");
+
+      if (data.bme680_ok === true) {
+        airStatus.textContent = "OK";
+        airStatus.className = "value ok";
+      } else if (data.bme680_ok === false) {
+        airStatus.textContent = "Fel";
+        airStatus.className = "value bad";
+      } else {
+        airStatus.textContent = "Okänt";
+        airStatus.className = "value warn";
+      }
+    }
+
+    async function loadLatestData(manual = false) {
+      const statusElement =
+        document.getElementById("systemStatus");
+
+      try {
+        if (manual) {
+          statusElement.textContent =
+            "Uppdaterar...";
+
+          statusElement.className =
+            "statusText warn";
+        }
+
+        const response = await fetch(
+          LATEST_URL + "?cacheBust=" + Date.now(),
+          {
+            cache: "no-store"
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            "HTTP " +
+            response.status +
+            " " +
+            response.statusText
+          );
+        }
+
+        const data = await response.json();
+
+        setText(
+          "temperature",
+          formatNumber(data.temperature_c, 2)
+        );
+
+        setText(
+          "humidity",
+          formatNumber(data.humidity_percent, 2)
+        );
+
+        setText(
+          "pressure",
+          formatNumber(data.pressure_hpa, 2)
+        );
+
+        updateAirQuality(data.iaq);
+        updateWaterStatus(data);
+        updateAirSensorStatus(data);
+
+        setText(
+          "timeSweden",
+          getTimestampText(data)
+        );
+
+        setText(
+          "frontendTime",
+          new Date().toLocaleString("sv-SE")
+        );
+
+        updateSystemStatus(data);
+
+      } catch (error) {
+        console.error(
+          "Fel vid hämtning av senaste data:",
+          error
+        );
+
+        statusElement.textContent =
+          "Fel vid hämtning";
+
+        statusElement.className =
+          "statusText bad";
+
+        document.getElementById(
+          "ageText"
+        ).textContent =
+          "Senaste mätning: --";
+
+        updateAirQuality(null);
+      }
+    }
+
+    function extractHistoryArray(json) {
+      if (Array.isArray(json)) {
+        return json;
+      }
+
+      if (
+        !json ||
+        typeof json !== "object"
+      ) {
+        return [];
+      }
+
+      const possibleKeys = [
+        "history",
+        "data",
+        "readings",
+        "measurements",
+        "items"
+      ];
+
+      for (const key of possibleKeys) {
+        if (Array.isArray(json[key])) {
+          return json[key];
+        }
+      }
+
+      return [];
+    }
+
+    function prepareHistory(historyJson) {
+      const rows =
+        extractHistoryArray(historyJson);
+
+      return rows
+        .map(function (row) {
+          const time = parseTime(row);
+
+          if (!time) {
+            return null;
+          }
+
+          return {
+            time: time,
+            label: formatChartTime(time),
+            temperature:
+              toNumber(row.temperature_c),
+            humidity:
+              toNumber(row.humidity_percent),
+            pressure:
+              toNumber(row.pressure_hpa),
+            iaq:
+              toNumber(row.iaq)
+          };
+        })
+        .filter(function (row) {
+          return row !== null;
+        })
+        .sort(function (a, b) {
+          return (
+            a.time.getTime() -
+            b.time.getTime()
+          );
+        })
+        .slice(-MAX_HISTORY_POINTS);
+    }
+
+    function chartOptions(
+      unit,
+      suggestedMin,
+      suggestedMax
+    ) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+
+        interaction: {
+          mode: "index",
+          intersect: false
+        },
+
+        plugins: {
+          legend: {
+            display: false
+          },
+
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                if (
+                  context.parsed.y === null
+                ) {
+                  return "Ingen mätning";
+                }
+
+                return (
+                  context.parsed.y +
+                  " " +
+                  unit
+                );
+              }
+            }
+          }
+        },
+
+        scales: {
+          x: {
+            ticks: {
+              color: "#cbd5e1",
+              maxTicksLimit: 8,
+              maxRotation: 0
+            },
+
+            grid: {
+              color:
+                "rgba(148, 163, 184, 0.12)"
+            }
+          },
+
+          y: {
+            suggestedMin:
+              suggestedMin,
+
+            suggestedMax:
+              suggestedMax,
+
+            ticks: {
+              color: "#cbd5e1"
+            },
+
+            grid: {
+              color:
+                "rgba(148, 163, 184, 0.15)"
+            }
+          }
+        }
+      };
+    }
+
+    function createOrUpdateChart(
+      existingChart,
+      canvasId,
+      labels,
+      values,
+      datasetLabel,
+      unit,
+      suggestedMin,
+      suggestedMax
+    ) {
+      if (existingChart) {
+        existingChart.data.labels =
+          labels;
+
+        existingChart.data.datasets[0].data =
+          values;
+
+        existingChart.update();
+
+        return existingChart;
+      }
+
+      const canvas =
+        document.getElementById(canvasId);
+
+      return new Chart(canvas, {
+        type: "line",
+
+        data: {
+          labels: labels,
+
+          datasets: [
+            {
+              label: datasetLabel,
+              data: values,
+              borderWidth: 2,
+              pointRadius:
+                labels.length > 100 ? 0 : 2,
+              pointHoverRadius: 5,
+              tension: 0.2,
+              spanGaps: true
+            }
+          ]
+        },
+
+        options: chartOptions(
+          unit,
+          suggestedMin,
+          suggestedMax
         )
-
-        status = response.status_code
-
-        print("GitHub status for", file_path, ":", status)
-
-        if status in (200, 201):
-            response.close()
-            return True
-
-        print("GitHub-feil for", file_path)
-
-        try:
-            print(response.text)
-        except Exception:
-            pass
-
-        response.close()
-        return False
-
-    except Exception as e:
-        print("Feil ved GitHub-opplasting:", file_path, e)
-        return False
-
-
-def send_telegram_message(message):
-    url = "https://api.telegram.org/bot{}/sendMessage".format(
-        TELEGRAM_BOT_TOKEN
-    )
-
-    headers = {
-        "Content-Type": "application/json"
+      });
     }
 
-    all_ok = True
+    async function loadHistoryData() {
+      const historyStatus =
+        document.getElementById(
+          "historyStatus"
+        );
 
-    for chat_id in TELEGRAM_CHAT_IDS:
-        payload = {
-            "chat_id": chat_id,
-            "text": message
+      try {
+        historyStatus.textContent =
+          "Hämtar historik...";
+
+        const response = await fetch(
+          HISTORY_URL +
+          "?cacheBust=" +
+          Date.now(),
+          {
+            cache: "no-store"
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            "HTTP " +
+            response.status +
+            " " +
+            response.statusText
+          );
         }
 
-        try:
-            print("Sender Telegram-varsel til:", chat_id)
+        const historyJson =
+          await response.json();
 
-            response = urequests.post(
-                url,
-                headers=headers,
-                data=ujson.dumps(payload)
-            )
+        const rows =
+          prepareHistory(historyJson);
 
-            status = response.status_code
+        if (rows.length === 0) {
+          historyStatus.textContent =
+            "Ingen giltig historik hittades.";
 
-            print("Telegram status for", chat_id, ":", status)
+          return;
+        }
 
-            try:
-                print("Telegram response:")
-                print(response.text)
-            except Exception:
-                pass
+        const labels =
+          rows.map(function (row) {
+            return row.label;
+          });
 
-            response.close()
+        const temperatures =
+          rows.map(function (row) {
+            return row.temperature;
+          });
 
-            if status == 200:
-                print("Telegram-varsel sendt til", chat_id)
-            else:
-                print("Telegram-varsel feilet til", chat_id)
-                all_ok = False
+        const humidities =
+          rows.map(function (row) {
+            return row.humidity;
+          });
 
-        except Exception as e:
-            print("Feil ved Telegram-varsel til", chat_id, ":", e)
-            all_ok = False
+        const pressures =
+          rows.map(function (row) {
+            return row.pressure;
+          });
 
-    return all_ok
+        const iaqValues =
+          rows.map(function (row) {
+            return row.iaq;
+          });
 
+        temperatureChart =
+          createOrUpdateChart(
+            temperatureChart,
+            "temperatureChart",
+            labels,
+            temperatures,
+            "Temperatur",
+            "°C"
+          );
 
+        humidityChart =
+          createOrUpdateChart(
+            humidityChart,
+            "humidityChart",
+            labels,
+            humidities,
+            "Luftfuktighet",
+            "%",
+            0,
+            100
+          );
 
+        pressureChart =
+          createOrUpdateChart(
+            pressureChart,
+            "pressureChart",
+            labels,
+            pressures,
+            "Lufttryck",
+            "hPa"
+          );
 
-def send_bme680_failure_message(measurement):
-    timestamp_utc = now_utc_iso()
-    timestamp_sweden = now_sweden_iso()
+        iaqChart =
+          createOrUpdateChart(
+            iaqChart,
+            "iaqChart",
+            labels,
+            iaqValues,
+            "Luftkvalitet",
+            "IAQ",
+            0,
+            500
+          );
 
-    message = (
-        "ADVARSEL: BME680 svarer ikke.\n"
-        "\n"
-        "Rom: 1\n"
-        "Modul: 1\n"
-        "Tid Sverige: {}\n"
-        "Tid UTC: {}\n"
-        "Vann AO: {}\n"
-        "Vann DO: {}\n"
-        "\n"
-        "Vannlekkasjeovervåkingen fortsetter.\n"
-        "BME680-data er midlertidig utilgjengelige."
-    ).format(
-        timestamp_sweden,
-        timestamp_utc,
-        measurement.get("water_ao"),
-        measurement.get("water_do")
-    )
+        const firstTime =
+          rows[0].time.toLocaleString("sv-SE");
 
-    return send_telegram_message(message)
+        const lastTime =
+          rows[
+            rows.length - 1
+          ].time.toLocaleString("sv-SE");
 
+        historyStatus.textContent =
+          rows.length +
+          " mätningar visas. " +
+          firstTime +
+          " – " +
+          lastTime;
 
-def send_bme680_recovered_message(measurement):
-    timestamp_utc = now_utc_iso()
-    timestamp_sweden = now_sweden_iso()
+      } catch (error) {
+        console.error(
+          "Fel vid hämtning av historik:",
+          error
+        );
 
-    message = (
-        "STATUS: BME680 fungerer igjen.\n"
-        "\n"
-        "Rom: 1\n"
-        "Modul: 1\n"
-        "Tid Sverige: {}\n"
-        "Tid UTC: {}\n"
-        "Temperatur: {} C\n"
-        "Fuktighet: {} %"
-    ).format(
-        timestamp_sweden,
-        timestamp_utc,
-        measurement.get("temp"),
-        measurement.get("hum")
-    )
-
-    return send_telegram_message(message)
-
-
-
-def handle_bme680_status(measurement):
-    """
-    Overvåker BME680 uten å stoppe vannalarmen.
-    Etter to minutter med sammenhengende feil sendes Telegram-varsel.
-    Når gyldige BME680-data kommer tilbake, sendes en statusmelding.
-    """
-    global bme_failure_started_ms
-    global bme_failure_alert_sent
-
-    now_ms = time.ticks_ms()
-    bme_ok = bool(measurement.get("bme680_ok", 0))
-
-    if bme_ok:
-        if bme_failure_started_ms is not None:
-            print("BME680 fungerer igjen")
-
-            if bme_failure_alert_sent and connect_wifi():
-                send_bme680_recovered_message(measurement)
-
-        bme_failure_started_ms = None
-        bme_failure_alert_sent = False
-        return
-
-    if bme_failure_started_ms is None:
-        bme_failure_started_ms = now_ms
-        print("BME680-feil oppdaget")
-
-    failure_duration_ms = time.ticks_diff(now_ms, bme_failure_started_ms)
-
-    if failure_duration_ms >= BME_FAILURE_CONFIRM_MS and not bme_failure_alert_sent:
-        print("BME680 har feilet i minst 2 minutter")
-
-        if connect_wifi() and send_bme680_failure_message(measurement):
-            bme_failure_alert_sent = True
-            print("BME680-feilvarsel sendt")
-        else:
-            print("BME680-feilvarsel kunne ikke sendes. Prøver igjen senere.")
-
-
-def calculate_simple_iaq(gas_kohms, humidity_percent):
-    """
-    Beregner en enkel, omtrentlig luftkvalitetsindeks fra BME680-data.
-    Dette er ikke Bosch BSEC IAQ, men en relativ indikator for dashboardet.
-    """
-    if gas_kohms is None:
-        return None
-
-    try:
-        gas = float(gas_kohms)
-        humidity = 40.0 if humidity_percent is None else float(humidity_percent)
-
-        if gas < 0:
-            return None
-
-        if gas >= 200.0:
-            gas_score = 0.0
-        elif gas <= 5.0:
-            gas_score = 400.0
-        else:
-            gas_score = 400.0 * (200.0 - gas) / 195.0
-
-        humidity_penalty = abs(humidity - 40.0) * 2.0
-        iaq = int(round(gas_score + humidity_penalty))
-
-        if iaq < 0:
-            iaq = 0
-        elif iaq > 500:
-            iaq = 500
-
-        return iaq
-
-    except Exception as exc:
-        print("IAQ-beregningsfeil:", exc)
-        return None
-
-
-def build_payload(measurement):
-    timestamp_utc = now_utc_iso()
-    timestamp_sweden = now_sweden_iso()
-
-    gas_kohms = measurement.get("gas")
-    humidity_percent = measurement.get("hum")
-    bme680_ok = bool(measurement.get("bme680_ok", 0))
-
-    if bme680_ok:
-        iaq = calculate_simple_iaq(gas_kohms, humidity_percent)
-    else:
-        iaq = None
-
-    payload_data = {
-        "timestamp": timestamp_utc,
-        "timestamp_utc": timestamp_utc,
-        "timestamp_sweden": timestamp_sweden,
-        "timezone": "Europe/Stockholm",
-
-        "source": "ESP32-C3_BME680_WATER_to_PicoW",
-
-        "bme680_ok": bme680_ok,
-
-        "temperature_c": measurement.get("temp"),
-        "humidity_percent": humidity_percent,
-        "pressure_hpa": measurement.get("press"),
-        "gas_kohms": gas_kohms,
-        "iaq": iaq,
-
-        "water_ao": measurement.get("water_ao"),
-        "water_do": measurement.get("water_do"),
-        "water_detected": bool(measurement.get("water_detected", 0)),
+        historyStatus.textContent =
+          "Historik kunde inte hämtas.";
+      }
     }
 
-    return payload_data
-
-
-def update_history(payload_data):
-    file_info = get_github_file(GITHUB_HISTORY_FILE_PATH)
-    text = file_info.get("text")
-
-    history = []
-
-    if text:
-        try:
-            parsed = ujson.loads(text)
-
-            if isinstance(parsed, list):
-                history = parsed
-            else:
-                print("history.json er ikke en liste. Lager ny liste.")
-                history = []
-
-        except Exception as e:
-            print("Kunne ikke parse history.json. Lager ny liste.", e)
-            history = []
-
-    history.append(payload_data)
-
-    if len(history) > MAX_HISTORY_ITEMS:
-        history = history[-MAX_HISTORY_ITEMS:]
-
-    message = "Update history {}".format(payload_data.get("timestamp"))
-
-    return upload_json_file(
-        GITHUB_HISTORY_FILE_PATH,
-        history,
-        message
-    )
-
-
-def upload_measurement_to_github(measurement):
-    payload_data = build_payload(measurement)
-    timestamp = payload_data.get("timestamp")
-
-    print("Laster opp måling:")
-    print(ujson.dumps(payload_data))
-
-    latest_message = "Update latest measurement {}".format(timestamp)
-
-    latest_ok = upload_json_file(
-        GITHUB_FILE_PATH,
-        payload_data,
-        latest_message
-    )
-
-    history_ok = update_history(payload_data)
-
-    if latest_ok:
-        print("latest.json oppdatert")
-
-    if history_ok:
-        print("history.json oppdatert")
-
-    if latest_ok or history_ok:
-        led.toggle()
-        return True
-
-    return False
-
-
-def send_leak_alarm(measurement):
-    timestamp_utc = now_utc_iso()
-    timestamp_sweden = now_sweden_iso()
-
-    water_ao = measurement.get("water_ao")
-    water_do = measurement.get("water_do")
-    temp = measurement.get("temp")
-    hum = measurement.get("hum")
-    bme680_ok = bool(measurement.get("bme680_ok", 1))
-
-    message = (
-        "ALARM: VANNLEKKASJE OPPDAGET!\n"
-        "\n"
-        "Rom: 1\n"
-        "Modul: 1\n"
-        "Tid Sverige: {}\n"
-        "Tid UTC: {}\n"
-        "Vann AO: {}\n"
-        "Vann DO: {}\n"
-        "BME680 OK: {}\n"
-        "Temperatur: {} C\n"
-        "Fuktighet: {} %\n"
-        "\n"
-        "Sjekk hjemme umiddelbart."
-    ).format(
-        timestamp_sweden,
-        timestamp_utc,
-        water_ao,
-        water_do,
-        bme680_ok,
-        temp if temp is not None else "ukjent",
-        hum if hum is not None else "ukjent"
-    )
-
-    return send_telegram_message(message)
-
-
-def send_water_normal_message(measurement):
-    timestamp_utc = now_utc_iso()
-    timestamp_sweden = now_sweden_iso()
-
-    message = (
-        "STATUS: Vannsensor er tilbake til normal/tørr.\n"
-        "\n"
-        "Rom: 1\n"
-        "Modul: 1\n"
-        "Tid Sverige: {}\n"
-        "Tid UTC: {}\n"
-        "Vann AO: {}\n"
-        "Vann DO: {}"
-    ).format(
-        timestamp_sweden,
-        timestamp_utc,
-        measurement.get("water_ao"),
-        measurement.get("water_do")
-    )
-
-    return send_telegram_message(message)
-
-
-def parse_sensor_line(text):
-    if text.startswith("bme680,"):
-        line_type = "bme680"
-    elif text.startswith("water_only,"):
-        line_type = "water_only"
-    else:
-        print("Ignorerer ukjent linje:", text)
-        return None
-
-    try:
-        parts = text.split(",")
-        values = {}
-
-        for part in parts[1:]:
-            if "=" not in part:
-                continue
-
-            key, value = part.split("=", 1)
-
-            if key in ("water_ao", "water_do", "water_detected", "bme680_ok"):
-                values[key] = int(float(value))
-            else:
-                values[key] = float(value)
-
-        if line_type == "bme680":
-            required = ("temp", "hum", "press", "gas")
-
-            for key in required:
-                if key not in values:
-                    print("Mangler felt:", key)
-                    return None
-
-            values["bme680_ok"] = 1
-
-        if line_type == "water_only":
-            values["temp"] = None
-            values["hum"] = None
-            values["press"] = None
-            values["gas"] = None
-            values["bme680_ok"] = values.get("bme680_ok", 0)
-
-        if "water_ao" not in values:
-            values["water_ao"] = None
-
-        if "water_do" not in values:
-            values["water_do"] = None
-
-        if "water_detected" not in values:
-            values["water_detected"] = 0
-
-        return values
-
-    except Exception as e:
-        print("Parse-feil:", e)
-        print("Linje:", text)
-        return None
-
-
-def print_measurement(measurement):
-    print("Temperatur:", measurement.get("temp"), "C")
-    print("Fuktighet:", measurement.get("hum"), "%")
-    print("Trykk:", measurement.get("press"), "hPa")
-    print("Gass:", measurement.get("gas"), "kOhm")
-    print(
-        "Beregnet IAQ:",
-        calculate_simple_iaq(measurement.get("gas"), measurement.get("hum"))
-        if bool(measurement.get("bme680_ok", 0))
-        else None
-    )
-    print("BME680 OK:", bool(measurement.get("bme680_ok", 0)))
-    print("Vann AO:", measurement.get("water_ao"))
-    print("Vann DO:", measurement.get("water_do"))
-    print("Vann oppdaget:", bool(measurement.get("water_detected", 0)))
-    print("----------------------")
-
-
-# =====================================================
-# Oppstart
-# =====================================================
-
-print("ESP32C_BME680_PICOW_hjemme starter på Pico W / Pico 2 W...")
-
-if connect_wifi():
-    sync_time(max_attempts=10)
-
-print("Venter på komplette sensorlinjer fra ESP32-C3...")
-
-
-# =====================================================
-# Hovedløkke
-# =====================================================
-
-while True:
-    if uart.any():
-        data = uart.read()
-
-        if data:
-            buffer += data
-
-            if len(buffer) > 2048:
-                print("ADVARSEL: UART-buffer for stor. Tømmer buffer.")
-                buffer = b""
-
-            while b"\n" in buffer:
-                line, buffer = buffer.split(b"\n", 1)
-
-                try:
-                    text = line.decode("utf-8").strip()
-
-                    if text:
-                        print("Komplett linje:", text)
-
-                        measurement = parse_sensor_line(text)
-
-                        if measurement:
-                            latest_measurement = measurement
-                            print_measurement(measurement)
-
-                            handle_bme680_status(measurement)
-
-                            current_water_detected = bool(
-                                measurement.get("water_detected", 0)
-                            )
-
-                            # -------------------------------------------------
-                            # LEKKASJEALARM
-                            # -------------------------------------------------
-                            if current_water_detected and not alarm_sent_for_current_leak:
-                                print("VANNLEKKASJE AKTIV - sender Telegram-varsel nå")
-
-                                if connect_wifi():
-                                    telegram_ok = send_leak_alarm(measurement)
-
-                                    if telegram_ok:
-                                        alarm_sent_for_current_leak = True
-                                        print("Alarm markert som sendt for denne lekkasjen")
-                                    else:
-                                        print("Telegram-varsel feilet. Prøver igjen ved neste våte måling.")
-
-                                    upload_ok = upload_measurement_to_github(measurement)
-
-                                    if upload_ok:
-                                        last_upload_ms = time.ticks_ms()
-                                        first_upload_done = True
-
-                            # -------------------------------------------------
-                            # TILBAKE TIL TØRR
-                            # -------------------------------------------------
-                            if previous_water_detected and not current_water_detected:
-                                print("Vannsensor tilbake til normal/tørr")
-
-                                alarm_sent_for_current_leak = False
-
-                                if connect_wifi():
-                                    send_water_normal_message(measurement)
-
-                                    upload_ok = upload_measurement_to_github(measurement)
-
-                                    if upload_ok:
-                                        last_upload_ms = time.ticks_ms()
-                                        first_upload_done = True
-
-                            previous_water_detected = current_water_detected
-
-                except Exception as e:
-                    print("Dekode-feil:", e)
-
-    now_ms = time.ticks_ms()
-
-    # -------------------------------------------------
-    # NORMAL GITHUB-OPPLASTING
-    # -------------------------------------------------
-    if latest_measurement is not None:
-        should_upload = False
-
-        if not first_upload_done:
-            should_upload = True
-
-        elif time.ticks_diff(now_ms, last_upload_ms) > UPLOAD_INTERVAL_MS:
-            should_upload = True
-
-        if should_upload:
-            if connect_wifi():
-                if upload_measurement_to_github(latest_measurement):
-                    last_upload_ms = now_ms
-                    first_upload_done = True
-
-    # Hindrer unødvendig høy CPU-belastning.
-    time.sleep_ms(20)
+    async function loadAllData(
+      manual = false
+    ) {
+      await Promise.all([
+        loadLatestData(manual),
+        loadHistoryData()
+      ]);
+    }
+
+    loadAllData(false);
+
+    setInterval(function () {
+      loadAllData(false);
+    }, REFRESH_INTERVAL_MS);
+  </script>
+</body>
+</html>
