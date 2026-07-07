@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <title>Tandläkarklinik rum 1 – vattenlarm</title>
 
   <style>
@@ -74,6 +75,10 @@
       border: 1px solid var(--border);
       border-radius: 18px;
       padding: 20px;
+      transition:
+        background-color 0.25s ease,
+        color 0.25s ease,
+        border-color 0.25s ease;
     }
 
     .label {
@@ -125,6 +130,34 @@
       font-size: 14px;
       color: var(--muted);
     }
+
+    .iaq-card {
+      background: var(--card);
+    }
+
+    .iaq-card .label {
+      color: inherit;
+      opacity: 0.85;
+    }
+
+    .iaq-number {
+      font-size: 42px;
+      font-weight: bold;
+      line-height: 1.1;
+    }
+
+    .iaq-description {
+      margin-top: 8px;
+      font-size: 21px;
+      font-weight: bold;
+    }
+
+    .iaq-range {
+      margin-top: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      opacity: 0.85;
+    }
   </style>
 </head>
 
@@ -132,61 +165,105 @@
   <div class="top">
     <div>
       <h1>Tandläkarklinik rum 1 – vattenlarm</h1>
+
       <p>
-        Översikt för rum 1. Sidan visar senaste mätningen och varnar vid vattenläckage.
+        Översikt för rum 1. Sidan visar senaste mätningen och varnar vid
+        vattenläckage.
       </p>
+
       <p>
         Sidan uppdateras automatiskt var femte minut.
       </p>
-      <button onclick="loadData(true)">Uppdatera nu</button>
+
+      <button type="button" onclick="loadData(true)">
+        Uppdatera nu
+      </button>
     </div>
 
     <div class="statusBox">
       <div class="label">Systemstatus</div>
-      <div id="systemStatus" class="statusText warn">Hämtar data...</div>
-      <div id="ageText" class="note">Senaste mätning: --</div>
+
+      <div id="systemStatus" class="statusText warn">
+        Hämtar data...
+      </div>
+
+      <div id="ageText" class="note">
+        Senaste mätning: --
+      </div>
     </div>
   </div>
 
   <div class="grid">
     <div class="card">
       <div class="label">Temperatur</div>
-      <div class="value"><span id="temperature">--</span> °C</div>
+
+      <div class="value">
+        <span id="temperature">--</span> °C
+      </div>
     </div>
 
     <div class="card">
       <div class="label">Luftfuktighet</div>
-      <div class="value"><span id="humidity">--</span> %</div>
+
+      <div class="value">
+        <span id="humidity">--</span> %
+      </div>
     </div>
 
     <div class="card">
       <div class="label">Lufttryck</div>
-      <div class="value"><span id="pressure">--</span> hPa</div>
+
+      <div class="value">
+        <span id="pressure">--</span> hPa
+      </div>
     </div>
 
-    <div class="card">
+    <div id="airQualityCard" class="card iaq-card">
       <div class="label">Luftkvalitet</div>
-      <div class="value"><span id="gas">--</span></div>
+
+      <div id="iaqValue" class="iaq-number">
+        --
+      </div>
+
+      <div id="iaqDescription" class="iaq-description">
+        Ingen IAQ-mätning
+      </div>
+
+      <div id="iaqRange" class="iaq-range">
+        IAQ 0–500
+      </div>
     </div>
 
     <div class="card">
       <div class="label">Vattenläckage</div>
-      <div class="value" id="waterStatus">--</div>
+
+      <div class="value" id="waterStatus">
+        --
+      </div>
     </div>
 
     <div class="card">
       <div class="label">Luftmätning</div>
-      <div class="value" id="airStatus">--</div>
+
+      <div class="value" id="airStatus">
+        --
+      </div>
     </div>
 
     <div class="card">
       <div class="label">Mätningens tid</div>
-      <div id="timeSweden" class="smallValue">--</div>
+
+      <div id="timeSweden" class="smallValue">
+        --
+      </div>
     </div>
 
     <div class="card">
       <div class="label">Sidan kontrollerades</div>
-      <div id="frontendTime" class="smallValue">--</div>
+
+      <div id="frontendTime" class="smallValue">
+        --
+      </div>
     </div>
   </div>
 
@@ -197,20 +274,31 @@
     const MAX_FRESH_AGE_MINUTES = 15;
 
     function setText(id, value) {
-      document.getElementById(id).textContent =
-        value === null || value === undefined || value === "" ? "--" : value;
+      const element = document.getElementById(id);
+
+      element.textContent =
+        value === null ||
+        value === undefined ||
+        value === ""
+          ? "--"
+          : value;
     }
 
     function formatNumber(value, digits = 2) {
-      if (typeof value !== "number" || Number.isNaN(value)) {
+      const number = Number(value);
+
+      if (!Number.isFinite(number)) {
         return "--";
       }
 
-      return value.toFixed(digits);
+      return number.toFixed(digits);
     }
 
     function parseTime(data) {
-      const timeText = data.timestamp_sweden || data.timestamp_utc || data.timestamp;
+      const timeText =
+        data.timestamp_sweden ||
+        data.timestamp_utc ||
+        data.timestamp;
 
       if (!timeText) {
         return null;
@@ -237,7 +325,8 @@
         return;
       }
 
-      const ageMinutes = (Date.now() - measuredAt.getTime()) / 60000;
+      const ageMinutes =
+        (Date.now() - measuredAt.getTime()) / 60000;
 
       if (ageMinutes < -2) {
         statusEl.textContent = "Tidsfel";
@@ -255,86 +344,238 @@
       }
 
       ageEl.textContent =
-        "Senaste mätning: " + ageMinutes.toFixed(1) + " minuter sedan";
+        "Senaste mätning: " +
+        Math.max(0, ageMinutes).toFixed(1) +
+        " minuter sedan";
+    }
+
+    function getIaqClassification(value) {
+      const iaq = Math.max(
+        0,
+        Math.min(500, Math.round(Number(value)))
+      );
+
+      if (iaq <= 50) {
+        return {
+          value: iaq,
+          text: "Bra",
+          range: "IAQ 0–50",
+          background: "#00e600",
+          foreground: "#000000"
+        };
+      }
+
+      if (iaq <= 100) {
+        return {
+          value: iaq,
+          text: "Genomsnittlig",
+          range: "IAQ 51–100",
+          background: "#ffff00",
+          foreground: "#000000"
+        };
+      }
+
+      if (iaq <= 150) {
+        return {
+          value: iaq,
+          text: "Lite dålig",
+          range: "IAQ 101–150",
+          background: "#ff8000",
+          foreground: "#000000"
+        };
+      }
+
+      if (iaq <= 200) {
+        return {
+          value: iaq,
+          text: "Dålig",
+          range: "IAQ 151–200",
+          background: "#ff0000",
+          foreground: "#000000"
+        };
+      }
+
+      if (iaq <= 300) {
+        return {
+          value: iaq,
+          text: "Sämre",
+          range: "IAQ 201–300",
+          background: "#9c0050",
+          foreground: "#ffffff"
+        };
+      }
+
+      return {
+        value: iaq,
+        text: "Mycket dålig",
+        range: "IAQ 301–500",
+        background: "#000000",
+        foreground: "#ffffff"
+      };
     }
 
     function updateAirQuality(value) {
-      const gasEl = document.getElementById("gas");
+      const card = document.getElementById("airQualityCard");
+      const valueEl = document.getElementById("iaqValue");
+      const descriptionEl =
+        document.getElementById("iaqDescription");
+      const rangeEl = document.getElementById("iaqRange");
 
-      if (typeof value !== "number" || Number.isNaN(value)) {
-        gasEl.textContent = "--";
+      const numericValue = Number(value);
+
+      if (!Number.isFinite(numericValue)) {
+        valueEl.textContent = "--";
+        descriptionEl.textContent = "Ingen IAQ-mätning";
+        rangeEl.textContent = "IAQ 0–500";
+
+        card.style.backgroundColor = "var(--card)";
+        card.style.color = "var(--text)";
+        card.style.borderColor = "var(--border)";
         return;
       }
 
-      if (value < 80) {
-        gasEl.textContent = "Låg";
-      } else if (value < 200) {
-        gasEl.textContent = "Normal";
+      const status = getIaqClassification(numericValue);
+
+      valueEl.textContent = status.value;
+      descriptionEl.textContent = status.text;
+      rangeEl.textContent = status.range;
+
+      card.style.backgroundColor = status.background;
+      card.style.color = status.foreground;
+      card.style.borderColor = status.background;
+    }
+
+    function updateWaterStatus(data) {
+      const waterStatus =
+        document.getElementById("waterStatus");
+
+      if (data.water_detected === true) {
+        waterStatus.textContent = "LÄCKAGE";
+        waterStatus.className = "value bad";
+      } else if (data.water_detected === false) {
+        waterStatus.textContent = "Torrt";
+        waterStatus.className = "value ok";
       } else {
-        gasEl.textContent = "Hög";
+        waterStatus.textContent = "Okänt";
+        waterStatus.className = "value warn";
+      }
+    }
+
+    function updateAirSensorStatus(data) {
+      const airStatus =
+        document.getElementById("airStatus");
+
+      if (data.bme680_ok === true) {
+        airStatus.textContent = "OK";
+        airStatus.className = "value ok";
+      } else if (data.bme680_ok === false) {
+        airStatus.textContent = "Fel";
+        airStatus.className = "value bad";
+      } else {
+        airStatus.textContent = "Okänt";
+        airStatus.className = "value warn";
       }
     }
 
     async function loadData(manual = false) {
       try {
+        const statusElement =
+          document.getElementById("systemStatus");
+
         if (manual) {
-          document.getElementById("systemStatus").textContent = "Uppdaterar...";
-          document.getElementById("systemStatus").className = "statusText warn";
+          statusElement.textContent = "Uppdaterar...";
+          statusElement.className = "statusText warn";
         }
 
-        const response = await fetch(LATEST_URL + "?cacheBust=" + Date.now(), {
-          cache: "no-store"
-        });
+        const response = await fetch(
+          LATEST_URL + "?cacheBust=" + Date.now(),
+          {
+            cache: "no-store"
+          }
+        );
 
         if (!response.ok) {
-          throw new Error("HTTP " + response.status + " " + response.statusText);
+          throw new Error(
+            "HTTP " +
+            response.status +
+            " " +
+            response.statusText
+          );
         }
 
         const data = await response.json();
 
-        setText("temperature", formatNumber(data.temperature_c, 2));
-        setText("humidity", formatNumber(data.humidity_percent, 2));
-        setText("pressure", formatNumber(data.pressure_hpa, 2));
+        setText(
+          "temperature",
+          formatNumber(data.temperature_c, 2)
+        );
 
-        updateAirQuality(data.gas_kohms);
+        setText(
+          "humidity",
+          formatNumber(data.humidity_percent, 2)
+        );
 
-        const waterStatus = document.getElementById("waterStatus");
+        setText(
+          "pressure",
+          formatNumber(data.pressure_hpa, 2)
+        );
 
-        if (data.water_detected === true) {
-          waterStatus.textContent = "LÄCKAGE";
-          waterStatus.className = "value bad";
-        } else if (data.water_detected === false) {
-          waterStatus.textContent = "Torrt";
-          waterStatus.className = "value ok";
-        } else {
-          waterStatus.textContent = "Okänt";
-          waterStatus.className = "value warn";
-        }
+        /*
+          Viktig:
+          Luftkvalitetskortet använder data.iaq.
 
-        const airStatus = document.getElementById("airStatus");
+          Exempel i latest.json:
+          "iaq": 72
 
-        if (data.bme680_ok === true) {
-          airStatus.textContent = "OK";
-          airStatus.className = "value ok";
-        } else {
-          airStatus.textContent = "Fel";
-          airStatus.className = "value bad";
-        }
+          gas_kohms används inte som IAQ eftersom
+          gasmotstånd och IAQ är två olika värden.
+        */
+        updateAirQuality(data.iaq);
 
-        setText("timeSweden", data.timestamp_sweden);
-        setText("frontendTime", new Date().toLocaleString("sv-SE"));
+        updateWaterStatus(data);
+        updateAirSensorStatus(data);
+
+        setText(
+          "timeSweden",
+          data.timestamp_sweden ||
+          data.timestamp_utc ||
+          data.timestamp
+        );
+
+        setText(
+          "frontendTime",
+          new Date().toLocaleString("sv-SE")
+        );
 
         updateSystemStatus(data);
 
       } catch (error) {
-        document.getElementById("systemStatus").textContent = "Fel vid hämtning";
-        document.getElementById("systemStatus").className = "statusText bad";
-        document.getElementById("ageText").textContent = "Senaste mätning: --";
+        console.error("Fel vid hämtning:", error);
+
+        document.getElementById(
+          "systemStatus"
+        ).textContent = "Fel vid hämtning";
+
+        document.getElementById(
+          "systemStatus"
+        ).className = "statusText bad";
+
+        document.getElementById(
+          "ageText"
+        ).textContent = "Senaste mätning: --";
+
+        updateAirQuality(null);
       }
     }
 
     loadData(false);
-    setInterval(loadData, REFRESH_INTERVAL_MS);
+
+    setInterval(
+      function () {
+        loadData(false);
+      },
+      REFRESH_INTERVAL_MS
+    );
   </script>
 </body>
 </html>
