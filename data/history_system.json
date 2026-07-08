@@ -1,0 +1,18 @@
+[
+  {
+    "timestamp_sweden": "2026-07-08T21:14:00+02:00",
+    "undervoltage_now": false,
+    "throttled_now": false,
+    "router_latency_ms": 1.1,
+    "internet_latency_ms": 12.8,
+    "github_latency_ms": 23.4
+  },
+  {
+    "timestamp_sweden": "2026-07-08T21:15:00+02:00",
+    "undervoltage_now": true,
+    "throttled_now": true,
+    "router_latency_ms": 1.4,
+    "internet_latency_ms": null,
+    "github_latency_ms": null
+  }
+]
