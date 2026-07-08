@@ -1,0 +1,13 @@
+{
+  "timestamp_sweden": "2026-07-08T21:15:00+02:00",
+  "undervoltage_now": true,
+  "throttled_now": true,
+  "temperature_c": 52.6,
+  "ethernet_link": true,
+  "router_reachable": true,
+  "router_latency_ms": 1.4,
+  "internet_reachable": false,
+  "internet_latency_ms": null,
+  "github_reachable": false,
+  "github_latency_ms": null
+}
