@@ -1,24 +1,34 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="sv">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f172a">
 
   <title>Tandläkarklinik rum 1 – vattenlarm</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
   <style>
     :root {
-      --bg: #0f172a;
-      --card: #1e293b;
-      --border: #334155;
-      --text: #f8fafc;
-      --muted: #cbd5e1;
-      --ok: #34d399;
-      --bad: #fb7185;
-      --warn: #fbbf24;
-      --accent: #38bdf8;
+      --bg: #f3f6fb;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #667085;
+      --line: #dfe5ee;
+
+      --ok: #147d64;
+      --ok-bg: #e8f7f2;
+
+      --warn: #a15c00;
+      --warn-bg: #fff4db;
+
+      --bad: #b42318;
+      --bad-bg: #fdecea;
+
+      --info: #175cd3;
+      --info-bg: #eaf2ff;
+
+      --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      --radius: 18px;
     }
 
     * {
@@ -27,1050 +37,1508 @@
 
     body {
       margin: 0;
-      min-height: 100vh;
-      padding: 30px;
-      font-family: Arial, sans-serif;
+      font-family:
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Arial,
+        sans-serif;
+
       color: var(--text);
-      background: var(--bg);
+
+      background:
+        radial-gradient(
+          circle at top left,
+          #e7efff 0,
+          transparent 35%
+        ),
+        var(--bg);
     }
 
-    h1 {
-      margin: 0 0 10px;
-      font-size: 42px;
+    .page {
+      width: min(1180px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 26px 0 44px;
     }
 
-    h2 {
-      margin: 38px 0 8px;
-      font-size: 28px;
-    }
+    .header {
+      background:
+        linear-gradient(
+          135deg,
+          #0f172a,
+          #1f3b65
+        );
 
-    p {
-      color: var(--muted);
-    }
+      color: #ffffff;
+      padding: 26px;
+      border-radius: 24px;
+      box-shadow: var(--shadow);
 
-    .top {
       display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
       gap: 20px;
+      align-items: center;
+      justify-content: space-between;
       flex-wrap: wrap;
     }
 
-    .statusBox {
-      min-width: 240px;
-      padding: 16px 20px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 18px;
+    .header h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.55rem, 3vw, 2.35rem);
     }
 
-    .statusText {
-      margin-top: 8px;
-      font-size: 24px;
-      font-weight: bold;
+    .header p {
+      margin: 0;
+      color: #d7e2f2;
+    }
+
+    .live-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+
+      padding: 10px 14px;
+
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+
+      background: #94a3b8;
+
+      box-shadow:
+        0 0 0 5px rgba(148, 163, 184, 0.18);
+    }
+
+    .dot.ok {
+      background: #4ade80;
+
+      box-shadow:
+        0 0 0 5px rgba(74, 222, 128, 0.18);
+    }
+
+    .dot.warn {
+      background: #fbbf24;
+
+      box-shadow:
+        0 0 0 5px rgba(251, 191, 36, 0.18);
+    }
+
+    .dot.bad {
+      background: #fb7185;
+
+      box-shadow:
+        0 0 0 5px rgba(251, 113, 133, 0.18);
+    }
+
+    .status-banner {
+      margin-top: 18px;
+      padding: 16px 18px;
+
+      border-radius: var(--radius);
+
+      background: var(--info-bg);
+      border: 1px solid #bfd4ff;
+      color: #1849a9;
+
+      box-shadow: var(--shadow);
+    }
+
+    .status-banner.ok {
+      background: var(--ok-bg);
+      border-color: #a7ddcc;
+      color: #11624f;
+    }
+
+    .status-banner.warn {
+      background: var(--warn-bg);
+      border-color: #f0cf82;
+      color: #7a4700;
+    }
+
+    .status-banner.bad {
+      background: var(--bad-bg);
+      border-color: #f2b8b5;
+      color: #8c1d18;
     }
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(12, 1fr);
       gap: 16px;
-      margin-top: 25px;
+      margin-top: 18px;
     }
 
     .card {
-      padding: 20px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      transition:
-        background-color 0.25s ease,
-        border-color 0.25s ease,
-        color 0.25s ease;
+      grid-column: span 3;
+
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+
+      padding: 19px;
+
+      box-shadow: var(--shadow);
+      min-height: 150px;
+    }
+
+    .card.wide {
+      grid-column: span 6;
+    }
+
+    .card.full {
+      grid-column: 1 / -1;
     }
 
     .label {
-      margin-bottom: 10px;
       color: var(--muted);
-      font-size: 15px;
+      font-size: 0.92rem;
+      margin-bottom: 12px;
     }
 
     .value {
-      font-size: 34px;
-      font-weight: bold;
-      word-break: break-word;
+      font-size: clamp(1.7rem, 4vw, 2.65rem);
+      line-height: 1;
+      font-weight: 750;
+      letter-spacing: -0.04em;
     }
 
-    .smallValue {
-      font-size: 17px;
-      word-break: break-word;
+    .unit {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-left: 5px;
+      letter-spacing: normal;
     }
 
-    .ok {
-      color: var(--ok);
-    }
-
-    .bad {
-      color: var(--bad);
-    }
-
-    .warn {
-      color: var(--warn);
-    }
-
-    button {
-      margin-top: 20px;
-      padding: 12px 18px;
-      color: #082f49;
-      font-weight: bold;
-      cursor: pointer;
-      background: var(--accent);
-      border: 0;
-      border-radius: 12px;
-    }
-
-    button:hover {
-      filter: brightness(1.08);
-    }
-
-    .note {
+    .sub {
       margin-top: 12px;
       color: var(--muted);
-      font-size: 14px;
+      font-size: 0.9rem;
+      line-height: 1.45;
     }
 
-    .iaq-card .label {
-      color: inherit;
-      opacity: 0.85;
+    .iaq-card {
+      transition:
+        background 0.2s ease,
+        border-color 0.2s ease;
     }
 
-    .iaq-number {
-      font-size: 42px;
-      font-weight: bold;
-      line-height: 1.1;
+    .iaq-card.good {
+      background: #eaf8ef;
+      border-color: #a6ddba;
     }
 
-    .iaq-description {
-      margin-top: 8px;
-      font-size: 21px;
-      font-weight: bold;
+    .iaq-card.moderate {
+      background: #fff8db;
+      border-color: #ead777;
     }
 
-    .iaq-range {
-      margin-top: 8px;
-      font-size: 14px;
-      font-weight: bold;
-      opacity: 0.85;
+    .iaq-card.poor {
+      background: #fff0df;
+      border-color: #efbe85;
     }
 
-    .history-header {
+    .iaq-card.bad {
+      background: #fde8e7;
+      border-color: #eeaaa6;
+    }
+
+    .water-status {
       display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 20px;
-      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+
+      font-size: 1.4rem;
+      font-weight: 750;
     }
 
-    #historyStatus {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 14px;
-    }
+    .water-icon {
+      width: 46px;
+      height: 46px;
 
-    .chart-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-      gap: 18px;
-      margin-top: 20px;
+      place-items: center;
+
+      border-radius: 50%;
+      background: var(--ok-bg);
+
+      font-size: 1.35rem;
     }
 
-    .chart-card {
-      min-height: 340px;
-      padding: 18px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 18px;
+    .water-alarm .water-icon {
+      background: var(--bad-bg);
     }
 
-    .chart-title {
-      margin-bottom: 14px;
-      color: var(--text);
-      font-size: 18px;
-      font-weight: bold;
+    .metadata {
+      display: grid;
+
+      grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+      gap: 12px;
+      margin-top: 10px;
     }
 
-    .chart-container {
+    .meta-item {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      padding: 12px;
+    }
+
+    .meta-title {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+
+    .meta-value {
+      font-weight: 650;
+      overflow-wrap: anywhere;
+    }
+
+    .chart-wrap {
       position: relative;
+
       width: 100%;
-      height: 270px;
+      height: 280px;
+
+      margin-top: 10px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+
+      border: 1px solid var(--line);
+      border-radius: 14px;
+
+      margin-top: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+      background: #ffffff;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--line);
+
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+
+    th {
+      background: #f8fafc;
+      color: #475467;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .footer {
+      margin-top: 20px;
+
+      color: var(--muted);
+      text-align: center;
+      font-size: 0.9rem;
+    }
+
+    .button {
+      border: 0;
+      border-radius: 12px;
+
+      background: #175cd3;
+      color: #ffffff;
+
+      font-weight: 700;
+      padding: 10px 15px;
+
+      cursor: pointer;
+    }
+
+    .button:hover {
+      background: #1849a9;
+    }
+
+    .button:disabled {
+      opacity: 0.65;
+      cursor: default;
+    }
+
+    @media (max-width: 900px) {
+      .card,
+      .card.wide {
+        grid-column: span 6;
+      }
     }
 
     @media (max-width: 600px) {
-      body {
-        padding: 18px;
+      .page {
+        width: min(100% - 18px, 1180px);
+        padding-top: 10px;
       }
 
-      h1 {
-        font-size: 32px;
+      .header {
+        padding: 20px;
+        border-radius: 18px;
       }
 
-      .chart-grid {
+      .card,
+      .card.wide {
+        grid-column: 1 / -1;
+      }
+
+      .metadata {
         grid-template-columns: 1fr;
-      }
-
-      .chart-card {
-        min-height: 310px;
-      }
-
-      .chart-container {
-        height: 240px;
       }
     }
   </style>
 </head>
 
 <body>
-  <div class="top">
-    <div>
-      <h1>Tandläkarklinik rum 1 – vattenlarm</h1>
+  <main class="page">
 
-      <p>
-        Översikt för rum 1. Sidan visar senaste mätningen och varnar vid
-        vattenläckage.
-      </p>
+    <header class="header">
+      <div>
+        <h1>Tandläkarklinik rum 1</h1>
 
-      <p>
-        Sidan uppdateras automatiskt var femte minut.
-      </p>
-
-      <button type="button" onclick="loadAllData(true)">
-        Uppdatera nu
-      </button>
-    </div>
-
-    <div class="statusBox">
-      <div class="label">Systemstatus</div>
-
-      <div id="systemStatus" class="statusText warn">
-        Hämtar data...
+        <p>
+          Vattenlarm och BME680-miljöövervakning
+        </p>
       </div>
 
-      <div id="ageText" class="note">
-        Senaste mätning: --
+      <div class="live-box">
+        <span id="liveDot" class="dot"></span>
+
+        <span id="liveText">
+          Hämtar data…
+        </span>
       </div>
-    </div>
-  </div>
+    </header>
 
-  <div class="grid">
-    <div class="card">
-      <div class="label">Temperatur</div>
-      <div class="value">
-        <span id="temperature">--</span> °C
-      </div>
-    </div>
+    <section
+      id="statusBanner"
+      class="status-banner"
+    >
+      Väntar på den senaste mätningen…
+    </section>
 
-    <div class="card">
-      <div class="label">Luftfuktighet</div>
-      <div class="value">
-        <span id="humidity">--</span> %
-      </div>
-    </div>
+    <section class="grid">
 
-    <div class="card">
-      <div class="label">Lufttryck</div>
-      <div class="value">
-        <span id="pressure">--</span> hPa
-      </div>
-    </div>
+      <article class="card">
+        <div class="label">
+          Temperatur
+        </div>
 
-    <div id="airQualityCard" class="card iaq-card">
-      <div class="label">Luftkvalitet</div>
+        <div class="value">
+          <span id="temperature">--</span>
 
-      <div id="iaqValue" class="iaq-number">
-        --
-      </div>
+          <span class="unit">
+            °C
+          </span>
+        </div>
 
-      <div id="iaqDescription" class="iaq-description">
-        Ingen IAQ-mätning
-      </div>
+        <div class="sub">
+          Aktuell rumstemperatur
+        </div>
+      </article>
 
-      <div id="iaqRange" class="iaq-range">
-        IAQ 0–500
-      </div>
-    </div>
+      <article class="card">
+        <div class="label">
+          Luftfuktighet
+        </div>
 
-    <div class="card">
-      <div class="label">Vattenläckage</div>
-      <div id="waterStatus" class="value">
-        --
-      </div>
-    </div>
+        <div class="value">
+          <span id="humidity">--</span>
 
-    <div class="card">
-      <div class="label">Luftmätning</div>
-      <div id="airStatus" class="value">
-        --
-      </div>
-    </div>
+          <span class="unit">
+            %
+          </span>
+        </div>
 
-    <div class="card">
-      <div class="label">Mätningens tid</div>
-      <div id="timeSweden" class="smallValue">
-        --
-      </div>
-    </div>
+        <div class="sub">
+          Relativ luftfuktighet
+        </div>
+      </article>
 
-    <div class="card">
-      <div class="label">Sidan kontrollerades</div>
-      <div id="frontendTime" class="smallValue">
-        --
-      </div>
-    </div>
-  </div>
+      <article class="card">
+        <div class="label">
+          Lufttryck
+        </div>
 
-  <div class="history-header">
-    <div>
-      <h2>Historik</h2>
-      <p>Kurvor från sparade historikmätningar.</p>
-    </div>
+        <div class="value">
+          <span id="pressure">--</span>
 
-    <div id="historyStatus">
-      Hämtar historik...
-    </div>
-  </div>
+          <span class="unit">
+            hPa
+          </span>
+        </div>
 
-  <div class="chart-grid">
-    <div class="chart-card">
-      <div class="chart-title">Temperatur °C</div>
-      <div class="chart-container">
-        <canvas id="temperatureChart"></canvas>
-      </div>
-    </div>
+        <div class="sub">
+          Atmosfäriskt tryck
+        </div>
+      </article>
 
-    <div class="chart-card">
-      <div class="chart-title">Luftfuktighet %</div>
-      <div class="chart-container">
-        <canvas id="humidityChart"></canvas>
-      </div>
-    </div>
+      <article class="card">
+        <div class="label">
+          Gasmotstånd
+        </div>
 
-    <div class="chart-card">
-      <div class="chart-title">Lufttryck hPa</div>
-      <div class="chart-container">
-        <canvas id="pressureChart"></canvas>
-      </div>
-    </div>
+        <div class="value">
+          <span id="gas">--</span>
 
-    <div class="chart-card">
-      <div class="chart-title">Luftkvalitet IAQ</div>
-      <div class="chart-container">
-        <canvas id="iaqChart"></canvas>
-      </div>
-    </div>
-  </div>
+          <span class="unit">
+            kΩ
+          </span>
+        </div>
+
+        <div class="sub">
+          BME680:s relativa gasmätning
+        </div>
+      </article>
+
+      <article
+        id="iaqCard"
+        class="card wide iaq-card"
+      >
+        <div class="label">
+          Beräknad luftkvalitet
+        </div>
+
+        <div class="value">
+          <span id="iaq">--</span>
+
+          <span class="unit">
+            IAQ
+          </span>
+        </div>
+
+        <div
+          id="iaqText"
+          class="sub"
+        >
+          Ingen IAQ-mätning tillgänglig.
+        </div>
+      </article>
+
+      <article
+        id="waterCard"
+        class="card wide"
+      >
+        <div class="label">
+          Vattensensor
+        </div>
+
+        <div
+          id="waterStatus"
+          class="water-status"
+        >
+          <span class="water-icon">
+            💧
+          </span>
+
+          <span>
+            Okänd status
+          </span>
+        </div>
+
+        <div
+          id="waterDetails"
+          class="sub"
+        >
+          AO: -- · DO: --
+        </div>
+      </article>
+
+      <article class="card full">
+        <div class="label">
+          Systeminformation
+        </div>
+
+        <div class="metadata">
+
+          <div class="meta-item">
+            <div class="meta-title">
+              Senaste mätning
+            </div>
+
+            <div
+              id="lastMeasurement"
+              class="meta-value"
+            >
+              --
+            </div>
+          </div>
+
+          <div class="meta-item">
+            <div class="meta-title">
+              Mätningens ålder
+            </div>
+
+            <div
+              id="measurementAge"
+              class="meta-value"
+            >
+              --
+            </div>
+          </div>
+
+          <div class="meta-item">
+            <div class="meta-title">
+              BME680
+            </div>
+
+            <div
+              id="bmeStatus"
+              class="meta-value"
+            >
+              --
+            </div>
+          </div>
+
+          <div class="meta-item">
+            <div class="meta-title">
+              Senast hämtad av webbläsaren
+            </div>
+
+            <div
+              id="lastFetch"
+              class="meta-value"
+            >
+              --
+            </div>
+          </div>
+
+        </div>
+      </article>
+
+      <article class="card full">
+
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+          "
+        >
+          <div>
+            <div class="label">
+              Senaste historiken
+            </div>
+
+            <div
+              class="sub"
+              style="margin-top: 0;"
+            >
+              Visar upp till de 30 senaste mätningarna.
+            </div>
+          </div>
+
+          <button
+            id="refreshButton"
+            class="button"
+            type="button"
+          >
+            Uppdatera nu
+          </button>
+        </div>
+
+        <div class="chart-wrap">
+          <canvas id="historyChart"></canvas>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tid</th>
+                <th>Temperatur</th>
+                <th>Fuktighet</th>
+                <th>Tryck</th>
+                <th>Gasmotstånd</th>
+                <th>IAQ</th>
+                <th>Vatten</th>
+              </tr>
+            </thead>
+
+            <tbody id="historyBody">
+              <tr>
+                <td colspan="7">
+                  Hämtar historik…
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </article>
+
+    </section>
+
+    <footer class="footer">
+      Sidan hämtar nya data varje minut.
+      IAQ-värdet är en relativ, förenklad indikator
+      och inte Bosch BSEC IAQ.
+    </footer>
+
+  </main>
 
   <script>
-    const LATEST_URL = "data/latest.json";
-    const HISTORY_URL = "data/history.json";
+    "use strict";
 
-    const REFRESH_INTERVAL_MS = 300000;
-    const MAX_FRESH_AGE_MINUTES = 15;
-    const MAX_HISTORY_POINTS = 300;
+    const LATEST_URL =
+      "data/latest.json";
 
-    let temperatureChart = null;
-    let humidityChart = null;
-    let pressureChart = null;
-    let iaqChart = null;
+    const HISTORY_URL =
+      "data/history.json";
 
-    function setText(id, value) {
-      const element = document.getElementById(id);
+    const REFRESH_INTERVAL_MS =
+      60_000;
 
-      element.textContent =
-        value === null ||
-        value === undefined ||
-        value === ""
-          ? "--"
-          : value;
+    const STALE_AFTER_MS =
+      3 * 60_000;
+
+    const $ = (id) =>
+      document.getElementById(id);
+
+    let latestData = null;
+    let historyData = [];
+
+    function cacheBustedUrl(path) {
+      const separator =
+        path.includes("?") ? "&" : "?";
+
+      return (
+        path +
+        separator +
+        "t=" +
+        Date.now()
+      );
     }
 
-    function toNumber(value) {
-      if (
-        value === null ||
-        value === undefined ||
-        value === ""
-      ) {
-        return null;
+    async function fetchJson(path) {
+      const response = await fetch(
+        cacheBustedUrl(path),
+        {
+          cache: "no-store",
+
+          headers: {
+            "Accept": "application/json"
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          path +
+          ": HTTP " +
+          response.status
+        );
       }
 
-      const number = Number(value);
-
-      return Number.isFinite(number)
-        ? number
-        : null;
+      return response.json();
     }
 
-    function formatNumber(value, digits = 2) {
-      const number = toNumber(value);
+    function isFiniteNumber(value) {
+      return (
+        typeof value === "number" &&
+        Number.isFinite(value)
+      );
+    }
 
-      if (number === null) {
+    function formatNumber(
+      value,
+      digits = 2
+    ) {
+      if (!isFiniteNumber(value)) {
         return "--";
       }
 
-      return number.toFixed(digits);
+      return value.toLocaleString(
+        "sv-SE",
+        {
+          minimumFractionDigits: digits,
+          maximumFractionDigits: digits
+        }
+      );
     }
 
-    function getTimestampText(data) {
-      return (
+    function parseMeasurementTime(data) {
+      const value =
         data.timestamp_sweden ||
         data.timestamp_utc ||
-        data.timestamp ||
-        data.time ||
-        data.datetime ||
-        null
-      );
-    }
+        data.timestamp;
 
-    function parseTime(data) {
-      const timeText = getTimestampText(data);
-
-      if (!timeText) {
+      if (!value) {
         return null;
       }
 
-      const parsed = new Date(timeText);
+      const date = new Date(value);
 
-      if (Number.isNaN(parsed.getTime())) {
+      if (Number.isNaN(date.getTime())) {
         return null;
       }
 
-      return parsed;
+      return date;
     }
 
-    function formatChartTime(date) {
-      return date.toLocaleString("sv-SE", {
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit"
-      });
+    function formatDateTime(date) {
+      if (!date) {
+        return "--";
+      }
+
+      return new Intl.DateTimeFormat(
+        "sv-SE",
+        {
+          timeZone: "Europe/Stockholm",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit"
+        }
+      ).format(date);
     }
 
-    function updateSystemStatus(data) {
-      const statusEl =
-        document.getElementById("systemStatus");
-
-      const ageEl =
-        document.getElementById("ageText");
-
-      const measuredAt = parseTime(data);
-
-      if (!measuredAt) {
-        statusEl.textContent = "Ingen tid";
-        statusEl.className = "statusText bad";
-        ageEl.textContent = "Senaste mätning: okänd";
-        return;
+    function formatAge(milliseconds) {
+      if (
+        !Number.isFinite(milliseconds) ||
+        milliseconds < 0
+      ) {
+        return "--";
       }
 
-      const ageMinutes =
-        (Date.now() - measuredAt.getTime()) / 60000;
+      const seconds =
+        Math.floor(milliseconds / 1000);
 
-      if (ageMinutes < -2) {
-        statusEl.textContent = "Tidsfel";
-        statusEl.className = "statusText warn";
-        ageEl.textContent = "Senaste mätning: tidsfel";
-        return;
+      if (seconds < 60) {
+        return seconds + " sekunder";
       }
 
-      if (ageMinutes <= MAX_FRESH_AGE_MINUTES) {
-        statusEl.textContent = "Normal";
-        statusEl.className = "statusText ok";
-      } else {
-        statusEl.textContent = "Gammal mätning";
-        statusEl.className = "statusText bad";
+      const minutes =
+        Math.floor(seconds / 60);
+
+      if (minutes < 60) {
+        return minutes + " minuter";
       }
 
-      ageEl.textContent =
-        "Senaste mätning: " +
-        Math.max(0, ageMinutes).toFixed(1) +
-        " minuter sedan";
-    }
+      const hours =
+        Math.floor(minutes / 60);
 
-    function getIaqClassification(value) {
-      const iaq = Math.max(
-        0,
-        Math.min(500, Math.round(Number(value)))
+      const restMinutes =
+        minutes % 60;
+
+      return (
+        hours +
+        " timmar " +
+        restMinutes +
+        " minuter"
       );
+    }
 
-      if (iaq <= 50) {
+    function getIaqState(value) {
+      if (!isFiniteNumber(value)) {
         return {
-          value: iaq,
-          text: "Bra",
-          range: "IAQ 0–50",
-          background: "#00e600",
-          foreground: "#000000"
+          className: "",
+          text:
+            "Ingen IAQ-mätning tillgänglig."
         };
       }
 
-      if (iaq <= 100) {
+      if (value <= 50) {
         return {
-          value: iaq,
-          text: "Genomsnittlig",
-          range: "IAQ 51–100",
-          background: "#ffff00",
-          foreground: "#000000"
+          className: "good",
+          text:
+            "God relativ luftkvalitet."
         };
       }
 
-      if (iaq <= 150) {
+      if (value <= 100) {
         return {
-          value: iaq,
-          text: "Lite dålig",
-          range: "IAQ 101–150",
-          background: "#ff8000",
-          foreground: "#000000"
+          className: "moderate",
+          text:
+            "Acceptabel relativ luftkvalitet."
         };
       }
 
-      if (iaq <= 200) {
+      if (value <= 150) {
         return {
-          value: iaq,
-          text: "Dålig",
-          range: "IAQ 151–200",
-          background: "#ff0000",
-          foreground: "#000000"
-        };
-      }
-
-      if (iaq <= 300) {
-        return {
-          value: iaq,
-          text: "Sämre",
-          range: "IAQ 201–300",
-          background: "#9c0050",
-          foreground: "#ffffff"
+          className: "poor",
+          text:
+            "Något försämrad relativ luftkvalitet."
         };
       }
 
       return {
-        value: iaq,
-        text: "Mycket dålig",
-        range: "IAQ 301–500",
-        background: "#000000",
-        foreground: "#ffffff"
+        className: "bad",
+        text:
+          "Försämrad relativ luftkvalitet – kontrollera ventilationen."
       };
     }
 
-    function updateAirQuality(value) {
-      const card =
-        document.getElementById("airQualityCard");
+    function updateLatest(data) {
+      latestData = data;
 
-      const valueEl =
-        document.getElementById("iaqValue");
-
-      const descriptionEl =
-        document.getElementById("iaqDescription");
-
-      const rangeEl =
-        document.getElementById("iaqRange");
-
-      const numericValue = toNumber(value);
-
-      if (numericValue === null) {
-        valueEl.textContent = "--";
-        descriptionEl.textContent =
-          "Ingen IAQ-mätning";
-        rangeEl.textContent = "IAQ 0–500";
-
-        card.style.backgroundColor =
-          "var(--card)";
-
-        card.style.color =
-          "var(--text)";
-
-        card.style.borderColor =
-          "var(--border)";
-
-        return;
-      }
-
-      const status =
-        getIaqClassification(numericValue);
-
-      valueEl.textContent =
-        status.value;
-
-      descriptionEl.textContent =
-        status.text;
-
-      rangeEl.textContent =
-        status.range;
-
-      card.style.backgroundColor =
-        status.background;
-
-      card.style.color =
-        status.foreground;
-
-      card.style.borderColor =
-        status.background;
-    }
-
-    function updateWaterStatus(data) {
-      const waterStatus =
-        document.getElementById("waterStatus");
-
-      if (data.water_detected === true) {
-        waterStatus.textContent = "LÄCKAGE";
-        waterStatus.className = "value bad";
-      } else if (data.water_detected === false) {
-        waterStatus.textContent = "Torrt";
-        waterStatus.className = "value ok";
-      } else {
-        waterStatus.textContent = "Okänt";
-        waterStatus.className = "value warn";
-      }
-    }
-
-    function updateAirSensorStatus(data) {
-      const airStatus =
-        document.getElementById("airStatus");
-
-      if (data.bme680_ok === true) {
-        airStatus.textContent = "OK";
-        airStatus.className = "value ok";
-      } else if (data.bme680_ok === false) {
-        airStatus.textContent = "Fel";
-        airStatus.className = "value bad";
-      } else {
-        airStatus.textContent = "Okänt";
-        airStatus.className = "value warn";
-      }
-    }
-
-    async function loadLatestData(manual = false) {
-      const statusElement =
-        document.getElementById("systemStatus");
-
-      try {
-        if (manual) {
-          statusElement.textContent =
-            "Uppdaterar...";
-
-          statusElement.className =
-            "statusText warn";
-        }
-
-        const response = await fetch(
-          LATEST_URL + "?cacheBust=" + Date.now(),
-          {
-            cache: "no-store"
-          }
+      $("temperature").textContent =
+        formatNumber(
+          data.temperature_c
         );
 
-        if (!response.ok) {
-          throw new Error(
-            "HTTP " +
-            response.status +
-            " " +
-            response.statusText
+      $("humidity").textContent =
+        formatNumber(
+          data.humidity_percent
+        );
+
+      $("pressure").textContent =
+        formatNumber(
+          data.pressure_hpa
+        );
+
+      $("gas").textContent =
+        formatNumber(
+          data.gas_kohms
+        );
+
+      $("iaq").textContent =
+        isFiniteNumber(data.iaq)
+          ? Math.round(data.iaq)
+          : "--";
+
+      const iaqState =
+        getIaqState(data.iaq);
+
+      $("iaqCard").className =
+        "card wide iaq-card " +
+        iaqState.className;
+
+      $("iaqText").textContent =
+        iaqState.text;
+
+      const waterDetected =
+        Boolean(data.water_detected);
+
+      $("waterCard").className =
+        waterDetected
+          ? "card wide water-alarm"
+          : "card wide";
+
+      $("waterStatus").innerHTML =
+        waterDetected
+          ? (
+            '<span class="water-icon">🚨</span>' +
+            '<span>VATTENLÄCKAGE UPPTÄCKT</span>'
+          )
+          : (
+            '<span class="water-icon">💧</span>' +
+            '<span>Torrt / normalt</span>'
           );
-        }
 
-        const data = await response.json();
+      $("waterDetails").textContent =
+        "AO: " +
+        (data.water_ao ?? "--") +
+        " · DO: " +
+        (data.water_do ?? "--");
 
-        setText(
-          "temperature",
-          formatNumber(data.temperature_c, 2)
+      const measurementTime =
+        parseMeasurementTime(data);
+
+      const ageMs =
+        measurementTime
+          ? Date.now() -
+            measurementTime.getTime()
+          : NaN;
+
+      $("lastMeasurement").textContent =
+        formatDateTime(
+          measurementTime
         );
 
-        setText(
-          "humidity",
-          formatNumber(data.humidity_percent, 2)
-        );
+      $("measurementAge").textContent =
+        formatAge(ageMs);
 
-        setText(
-          "pressure",
-          formatNumber(data.pressure_hpa, 2)
-        );
+      $("bmeStatus").textContent =
+        data.bme680_ok
+          ? "Fungerar"
+          : "Fel / saknar data";
 
-        updateAirQuality(data.iaq);
-        updateWaterStatus(data);
-        updateAirSensorStatus(data);
+      const stale =
+        Number.isFinite(ageMs) &&
+        ageMs > STALE_AFTER_MS;
 
-        setText(
-          "timeSweden",
-          getTimestampText(data)
-        );
+      const banner =
+        $("statusBanner");
 
-        setText(
-          "frontendTime",
-          new Date().toLocaleString("sv-SE")
-        );
+      const liveDot =
+        $("liveDot");
 
-        updateSystemStatus(data);
+      const liveText =
+        $("liveText");
 
-      } catch (error) {
-        console.error(
-          "Fel vid hämtning av senaste data:",
-          error
-        );
+      if (waterDetected) {
+        banner.className =
+          "status-banner bad";
 
-        statusElement.textContent =
-          "Fel vid hämtning";
+        banner.textContent =
+          "ALARM: Vattensensorn har registrerat vatten.";
 
-        statusElement.className =
-          "statusText bad";
+        liveDot.className =
+          "dot bad";
 
-        document.getElementById(
-          "ageText"
-        ).textContent =
-          "Senaste mätning: --";
+        liveText.textContent =
+          "Vattenlarm";
+      }
 
-        updateAirQuality(null);
+      else if (!data.bme680_ok) {
+        banner.className =
+          "status-banner warn";
+
+        banner.textContent =
+          "Vattensensorn är aktiv, men BME680-data saknas.";
+
+        liveDot.className =
+          "dot warn";
+
+        liveText.textContent =
+          "BME680-fel";
+      }
+
+      else if (stale) {
+        banner.className =
+          "status-banner warn";
+
+        banner.textContent =
+          "Varning: den senaste mätningen är " +
+          formatAge(ageMs) +
+          " gammal.";
+
+        liveDot.className =
+          "dot warn";
+
+        liveText.textContent =
+          "Gammal mätning";
+      }
+
+      else {
+        banner.className =
+          "status-banner ok";
+
+        banner.textContent =
+          "Systemet fungerar och den senaste mätningen är aktuell.";
+
+        liveDot.className =
+          "dot ok";
+
+        liveText.textContent =
+          "Online";
       }
     }
 
-    function extractHistoryArray(json) {
-      if (Array.isArray(json)) {
-        return json;
-      }
+    function updateFetchTime() {
+      $("lastFetch").textContent =
+        formatDateTime(
+          new Date()
+        );
+    }
+
+    function updateHistoryTable(rows) {
+      const body =
+        $("historyBody");
 
       if (
-        !json ||
-        typeof json !== "object"
+        !Array.isArray(rows) ||
+        rows.length === 0
       ) {
-        return [];
+        body.innerHTML =
+          '<tr>' +
+          '<td colspan="7">' +
+          'Ingen historik tillgänglig.' +
+          '</td>' +
+          '</tr>';
+
+        return;
       }
 
-      const possibleKeys = [
-        "history",
-        "data",
-        "readings",
-        "measurements",
-        "items"
-      ];
+      const newestFirst =
+        rows
+          .slice(-30)
+          .reverse();
 
-      for (const key of possibleKeys) {
-        if (Array.isArray(json[key])) {
-          return json[key];
-        }
-      }
+      body.innerHTML =
+        newestFirst
+          .map((row) => {
+            const date =
+              parseMeasurementTime(row);
 
-      return [];
+            const water =
+              row.water_detected
+                ? "ALARM"
+                : "Torrt";
+
+            const iaqValue =
+              isFiniteNumber(row.iaq)
+                ? Math.round(row.iaq)
+                : "--";
+
+            return `
+              <tr>
+                <td>
+                  ${formatDateTime(date)}
+                </td>
+
+                <td>
+                  ${formatNumber(row.temperature_c)} °C
+                </td>
+
+                <td>
+                  ${formatNumber(row.humidity_percent)} %
+                </td>
+
+                <td>
+                  ${formatNumber(row.pressure_hpa)} hPa
+                </td>
+
+                <td>
+                  ${formatNumber(row.gas_kohms)} kΩ
+                </td>
+
+                <td>
+                  ${iaqValue}
+                </td>
+
+                <td>
+                  ${water}
+                </td>
+              </tr>
+            `;
+          })
+          .join("");
     }
 
-    function prepareHistory(historyJson) {
-      const rows =
-        extractHistoryArray(historyJson);
-
-      return rows
-        .map(function (row) {
-          const time = parseTime(row);
-
-          if (!time) {
-            return null;
-          }
-
-          return {
-            time: time,
-            label: formatChartTime(time),
-            temperature:
-              toNumber(row.temperature_c),
-            humidity:
-              toNumber(row.humidity_percent),
-            pressure:
-              toNumber(row.pressure_hpa),
-            iaq:
-              toNumber(row.iaq)
-          };
-        })
-        .filter(function (row) {
-          return row !== null;
-        })
-        .sort(function (a, b) {
-          return (
-            a.time.getTime() -
-            b.time.getTime()
-          );
-        })
-        .slice(-MAX_HISTORY_POINTS);
-    }
-
-    function chartOptions(
-      unit,
-      suggestedMin,
-      suggestedMax
-    ) {
-      return {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-
-        interaction: {
-          mode: "index",
-          intersect: false
-        },
-
-        plugins: {
-          legend: {
-            display: false
-          },
-
-          tooltip: {
-            callbacks: {
-              label: function (context) {
-                if (
-                  context.parsed.y === null
-                ) {
-                  return "Ingen mätning";
-                }
-
-                return (
-                  context.parsed.y +
-                  " " +
-                  unit
-                );
-              }
-            }
-          }
-        },
-
-        scales: {
-          x: {
-            ticks: {
-              color: "#cbd5e1",
-              maxTicksLimit: 8,
-              maxRotation: 0
-            },
-
-            grid: {
-              color:
-                "rgba(148, 163, 184, 0.12)"
-            }
-          },
-
-          y: {
-            suggestedMin:
-              suggestedMin,
-
-            suggestedMax:
-              suggestedMax,
-
-            ticks: {
-              color: "#cbd5e1"
-            },
-
-            grid: {
-              color:
-                "rgba(148, 163, 184, 0.15)"
-            }
-          }
-        }
-      };
-    }
-
-    function createOrUpdateChart(
-      existingChart,
-      canvasId,
-      labels,
-      values,
-      datasetLabel,
-      unit,
-      suggestedMin,
-      suggestedMax
-    ) {
-      if (existingChart) {
-        existingChart.data.labels =
-          labels;
-
-        existingChart.data.datasets[0].data =
-          values;
-
-        existingChart.update();
-
-        return existingChart;
-      }
-
+    function drawHistoryChart(rows) {
       const canvas =
-        document.getElementById(canvasId);
+        $("historyChart");
 
-      return new Chart(canvas, {
-        type: "line",
+      const context =
+        canvas.getContext("2d");
 
-        data: {
-          labels: labels,
+      const rect =
+        canvas.getBoundingClientRect();
 
-          datasets: [
-            {
-              label: datasetLabel,
-              data: values,
-              borderWidth: 2,
-              pointRadius:
-                labels.length > 100 ? 0 : 2,
-              pointHoverRadius: 5,
-              tension: 0.2,
-              spanGaps: true
-            }
-          ]
-        },
+      const ratio =
+        window.devicePixelRatio || 1;
 
-        options: chartOptions(
-          unit,
-          suggestedMin,
-          suggestedMax
-        )
-      });
-    }
-
-    async function loadHistoryData() {
-      const historyStatus =
-        document.getElementById(
-          "historyStatus"
+      canvas.width =
+        Math.max(
+          1,
+          Math.floor(
+            rect.width * ratio
+          )
         );
 
-      try {
-        historyStatus.textContent =
-          "Hämtar historik...";
-
-        const response = await fetch(
-          HISTORY_URL +
-          "?cacheBust=" +
-          Date.now(),
-          {
-            cache: "no-store"
-          }
+      canvas.height =
+        Math.max(
+          1,
+          Math.floor(
+            rect.height * ratio
+          )
         );
 
-        if (!response.ok) {
-          throw new Error(
-            "HTTP " +
-            response.status +
-            " " +
-            response.statusText
-          );
-        }
+      context.setTransform(
+        ratio,
+        0,
+        0,
+        ratio,
+        0,
+        0
+      );
 
-        const historyJson =
-          await response.json();
+      const width =
+        rect.width;
 
-        const rows =
-          prepareHistory(historyJson);
+      const height =
+        rect.height;
 
-        if (rows.length === 0) {
-          historyStatus.textContent =
-            "Ingen giltig historik hittades.";
+      context.clearRect(
+        0,
+        0,
+        width,
+        height
+      );
 
+      const cleanRows =
+        Array.isArray(rows)
+          ? rows
+              .slice(-30)
+              .filter((row) =>
+                isFiniteNumber(
+                  row.temperature_c
+                ) ||
+                isFiniteNumber(
+                  row.humidity_percent
+                ) ||
+                isFiniteNumber(
+                  row.iaq
+                )
+              )
+          : [];
+
+      if (cleanRows.length < 2) {
+        context.fillStyle =
+          "#667085";
+
+        context.font =
+          "14px system-ui";
+
+        context.fillText(
+          "För lite historik för att rita grafen.",
+          18,
+          32
+        );
+
+        return;
+      }
+
+      const padding = {
+        left: 46,
+        right: 18,
+        top: 20,
+        bottom: 36
+      };
+
+      const chartWidth =
+        width -
+        padding.left -
+        padding.right;
+
+      const chartHeight =
+        height -
+        padding.top -
+        padding.bottom;
+
+      context.strokeStyle =
+        "#dfe5ee";
+
+      context.lineWidth =
+        1;
+
+      for (
+        let i = 0;
+        i <= 4;
+        i += 1
+      ) {
+        const y =
+          padding.top +
+          (chartHeight * i) / 4;
+
+        context.beginPath();
+
+        context.moveTo(
+          padding.left,
+          y
+        );
+
+        context.lineTo(
+          width - padding.right,
+          y
+        );
+
+        context.stroke();
+      }
+
+      function plot(
+        values,
+        strokeStyle,
+        min,
+        max
+      ) {
+        const valid =
+          values
+            .map(
+              (value, index) => ({
+                value,
+                index
+              })
+            )
+            .filter(
+              (item) =>
+                isFiniteNumber(
+                  item.value
+                )
+            );
+
+        if (valid.length < 2) {
           return;
         }
 
-        const labels =
-          rows.map(function (row) {
-            return row.label;
-          });
+        context.strokeStyle =
+          strokeStyle;
 
-        const temperatures =
-          rows.map(function (row) {
-            return row.temperature;
-          });
+        context.lineWidth =
+          2.2;
 
-        const humidities =
-          rows.map(function (row) {
-            return row.humidity;
-          });
+        context.beginPath();
 
-        const pressures =
-          rows.map(function (row) {
-            return row.pressure;
-          });
+        valid.forEach(
+          (
+            item,
+            sequenceIndex
+          ) => {
+            const x =
+              padding.left +
+              (
+                chartWidth *
+                item.index
+              ) /
+              Math.max(
+                1,
+                values.length - 1
+              );
 
-        const iaqValues =
-          rows.map(function (row) {
-            return row.iaq;
-          });
+            const normalized =
+              (
+                item.value - min
+              ) /
+              (
+                max - min
+              );
 
-        temperatureChart =
-          createOrUpdateChart(
-            temperatureChart,
-            "temperatureChart",
-            labels,
-            temperatures,
-            "Temperatur",
-            "°C"
+            const y =
+              padding.top +
+              chartHeight -
+              Math.max(
+                0,
+                Math.min(
+                  1,
+                  normalized
+                )
+              ) *
+              chartHeight;
+
+            if (sequenceIndex === 0) {
+              context.moveTo(x, y);
+            } else {
+              context.lineTo(x, y);
+            }
+          }
+        );
+
+        context.stroke();
+      }
+
+      const temperatures =
+        cleanRows.map(
+          (row) =>
+            row.temperature_c
+        );
+
+      const humidities =
+        cleanRows.map(
+          (row) =>
+            row.humidity_percent
+        );
+
+      const iaqValues =
+        cleanRows.map(
+          (row) =>
+            row.iaq
+        );
+
+      plot(
+        temperatures,
+        "#175cd3",
+        15,
+        35
+      );
+
+      plot(
+        humidities,
+        "#147d64",
+        20,
+        70
+      );
+
+      plot(
+        iaqValues,
+        "#a15c00",
+        0,
+        150
+      );
+
+      context.font =
+        "12px system-ui";
+
+      context.fillStyle =
+        "#175cd3";
+
+      context.fillText(
+        "Temperatur",
+        padding.left,
+        height - 10
+      );
+
+      context.fillStyle =
+        "#147d64";
+
+      context.fillText(
+        "Fuktighet",
+        padding.left + 90,
+        height - 10
+      );
+
+      context.fillStyle =
+        "#a15c00";
+
+      context.fillText(
+        "IAQ",
+        padding.left + 175,
+        height - 10
+      );
+    }
+
+    async function loadLatest() {
+      const data =
+        await fetchJson(
+          LATEST_URL
+        );
+
+      updateLatest(data);
+    }
+
+    async function loadHistory() {
+      try {
+        const rows =
+          await fetchJson(
+            HISTORY_URL
           );
 
-        humidityChart =
-          createOrUpdateChart(
-            humidityChart,
-            "humidityChart",
-            labels,
-            humidities,
-            "Luftfuktighet",
-            "%",
-            0,
-            100
-          );
+        historyData =
+          Array.isArray(rows)
+            ? rows
+            : [];
 
-        pressureChart =
-          createOrUpdateChart(
-            pressureChart,
-            "pressureChart",
-            labels,
-            pressures,
-            "Lufttryck",
-            "hPa"
-          );
+        updateHistoryTable(
+          historyData
+        );
 
-        iaqChart =
-          createOrUpdateChart(
-            iaqChart,
-            "iaqChart",
-            labels,
-            iaqValues,
-            "Luftkvalitet",
-            "IAQ",
-            0,
-            500
-          );
+        drawHistoryChart(
+          historyData
+        );
+      }
 
-        const firstTime =
-          rows[0].time.toLocaleString("sv-SE");
-
-        const lastTime =
-          rows[
-            rows.length - 1
-          ].time.toLocaleString("sv-SE");
-
-        historyStatus.textContent =
-          rows.length +
-          " mätningar visas. " +
-          firstTime +
-          " – " +
-          lastTime;
-
-      } catch (error) {
-        console.error(
-          "Fel vid hämtning av historik:",
+      catch (error) {
+        console.warn(
+          "Historik kunde inte hämtas:",
           error
         );
 
-        historyStatus.textContent =
-          "Historik kunde inte hämtas.";
+        $("historyBody").innerHTML =
+          '<tr>' +
+          '<td colspan="7">' +
+          'Historiken kunde inte hämtas just nu. ' +
+          'Aktuella värden fungerar fortfarande.' +
+          '</td>' +
+          '</tr>';
+
+        drawHistoryChart([]);
       }
     }
 
-    async function loadAllData(
-      manual = false
-    ) {
-      await Promise.all([
-        loadLatestData(manual),
-        loadHistoryData()
-      ]);
+    async function refreshAll() {
+      const button =
+        $("refreshButton");
+
+      button.disabled =
+        true;
+
+      button.textContent =
+        "Uppdaterar…";
+
+      try {
+        await loadLatest();
+
+        updateFetchTime();
+      }
+
+      catch (error) {
+        console.error(
+          "Senaste mätningen kunde inte hämtas:",
+          error
+        );
+
+        const banner =
+          $("statusBanner");
+
+        banner.className =
+          "status-banner bad";
+
+        banner.textContent =
+          "Kunde inte hämta data/latest.json. " +
+          "Kontrollera GitHub Pages och filens innehåll.";
+
+        $("liveDot").className =
+          "dot bad";
+
+        $("liveText").textContent =
+          "Datafel";
+      }
+
+      await loadHistory();
+
+      button.disabled =
+        false;
+
+      button.textContent =
+        "Uppdatera nu";
     }
 
-    loadAllData(false);
+    $("refreshButton")
+      .addEventListener(
+        "click",
+        refreshAll
+      );
 
-    setInterval(function () {
-      loadAllData(false);
-    }, REFRESH_INTERVAL_MS);
+    window.addEventListener(
+      "resize",
+      () => {
+        drawHistoryChart(
+          historyData
+        );
+      }
+    );
+
+    refreshAll();
+
+    setInterval(
+      refreshAll,
+      REFRESH_INTERVAL_MS
+    );
   </script>
 </body>
 </html>
