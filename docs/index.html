@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <title>Tandläkarklinik rum 1 – vattenlarm</title>
+  <title>Tandläkarklinik rum 1 – övervakning</title>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -40,12 +40,27 @@
     }
 
     h2 {
-      margin: 38px 0 8px;
+      margin: 42px 0 8px;
       font-size: 28px;
     }
 
     p {
       color: var(--muted);
+    }
+
+    button {
+      margin-top: 16px;
+      padding: 12px 18px;
+      color: #082f49;
+      font-weight: bold;
+      cursor: pointer;
+      background: var(--accent);
+      border: 0;
+      border-radius: 12px;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
     }
 
     .top {
@@ -57,7 +72,7 @@
     }
 
     .statusBox {
-      min-width: 250px;
+      min-width: 270px;
       padding: 16px 20px;
       background: var(--card);
       border: 1px solid var(--border);
@@ -70,11 +85,30 @@
       font-weight: bold;
     }
 
+    .note {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .section-status {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 16px;
-      margin-top: 25px;
+      margin-top: 20px;
     }
 
     .card {
@@ -82,10 +116,6 @@
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 18px;
-      transition:
-        background-color 0.25s ease,
-        border-color 0.25s ease,
-        color 0.25s ease;
     }
 
     .label {
@@ -102,6 +132,7 @@
 
     .smallValue {
       font-size: 17px;
+      font-weight: bold;
       word-break: break-word;
     }
 
@@ -115,27 +146,6 @@
 
     .warn {
       color: var(--warn);
-    }
-
-    button {
-      margin-top: 20px;
-      padding: 12px 18px;
-      color: #082f49;
-      font-weight: bold;
-      cursor: pointer;
-      background: var(--accent);
-      border: 0;
-      border-radius: 12px;
-    }
-
-    button:hover {
-      filter: brightness(1.08);
-    }
-
-    .note {
-      margin-top: 12px;
-      color: var(--muted);
-      font-size: 14px;
     }
 
     .iaq-card .label {
@@ -162,20 +172,6 @@
       opacity: 0.9;
     }
 
-    .history-header {
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 20px;
-      flex-wrap: wrap;
-    }
-
-    #historyStatus {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
     .chart-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
@@ -193,9 +189,14 @@
 
     .chart-title {
       margin-bottom: 14px;
-      color: var(--text);
       font-size: 18px;
       font-weight: bold;
+    }
+
+    .chart-note {
+      margin: -6px 0 12px;
+      color: var(--muted);
+      font-size: 13px;
     }
 
     .chart-container {
@@ -231,11 +232,11 @@
 <body>
   <div class="top">
     <div>
-      <h1>Tandläkarklinik rum 1 – vattenlarm</h1>
+      <h1>Tandläkarklinik rum 1</h1>
 
       <p>
-        Översikt för rum 1. Sidan visar senaste mätningen och varnar vid
-        vattenläckage.
+        Vattenlarm, luftkvalitet, Raspberry Pi-strömstatus och
+        nätverksövervakning.
       </p>
 
       <p>
@@ -248,15 +249,34 @@
     </div>
 
     <div class="statusBox">
-      <div class="label">Systemstatus</div>
+      <div class="label">Sensorstatus</div>
 
-      <div id="systemStatus" class="statusText warn">
+      <div id="sensorStatus" class="statusText warn">
         Hämtar data...
       </div>
 
-      <div id="ageText" class="note">
+      <div id="sensorAgeText" class="note">
         Senaste mätning: --
       </div>
+
+      <div class="label" style="margin-top:18px;">
+        Pi- och nätverksstatus
+      </div>
+
+      <div id="piSystemStatus" class="statusText warn">
+        Hämtar data...
+      </div>
+
+      <div id="systemAgeText" class="note">
+        Senaste systemmätning: --
+      </div>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <div>
+      <h2>Sensorer och vattenlarm</h2>
+      <p>Senaste mätningen från ESP32-C3 och Pico 2 W.</p>
     </div>
   </div>
 
@@ -306,7 +326,7 @@
     </div>
 
     <div class="card">
-      <div class="label">Luftmätning</div>
+      <div class="label">BME680</div>
       <div id="airStatus" class="value">
         --
       </div>
@@ -327,13 +347,134 @@
     </div>
   </div>
 
-  <div class="history-header">
+  <div class="section-header">
     <div>
-      <h2>Historik</h2>
-      <p>Kurvor från sparade historikmätningar.</p>
+      <h2>Raspberry Pi och nätverk</h2>
+
+      <p>
+        Pi 3 B+ registrerar underspänning, throttling,
+        temperatur och nätverksstatus.
+      </p>
     </div>
 
-    <div id="historyStatus">
+    <div id="latestSystemStatus" class="section-status">
+      Hämtar systemdata...
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="label">Aktiv underspänning</div>
+      <div id="undervoltageNow" class="value">
+        --
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Aktiv throttling</div>
+      <div id="throttledNow" class="value">
+        --
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Underspänning har inträffat</div>
+      <div id="undervoltageOccurred" class="value">
+        --
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Pi-temperatur</div>
+      <div class="value">
+        <span id="piTemperature">--</span> °C
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Ethernet</div>
+      <div id="ethernetStatus" class="value">
+        --
+      </div>
+
+      <div id="ethernetDetails" class="note">
+        --
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Router</div>
+      <div id="routerStatus" class="value">
+        --
+      </div>
+
+      <div id="routerDetails" class="note">
+        --
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Internet</div>
+      <div id="internetStatus" class="value">
+        --
+      </div>
+
+      <div id="internetDetails" class="note">
+        --
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">GitHub</div>
+      <div id="githubStatus" class="value">
+        --
+      </div>
+
+      <div id="githubDetails" class="note">
+        --
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Mottagningsfel</div>
+      <div id="rxErrors" class="value">
+        --
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Tappade mottagna paket</div>
+      <div id="rxDropped" class="value">
+        --
+      </div>
+
+      <div class="note">
+        Samlad räknare sedan Pi startades.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Sända fel</div>
+      <div id="txErrors" class="value">
+        --
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Systemmätningens tid</div>
+      <div id="systemTimeSweden" class="smallValue">
+        --
+      </div>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <div>
+      <h2>Sensorhistorik</h2>
+      <p>Kurvor från sparade sensorvärden.</p>
+    </div>
+
+    <div id="historyStatus" class="section-status">
       Hämtar historik...
     </div>
   </div>
@@ -341,6 +482,7 @@
   <div class="chart-grid">
     <div class="chart-card">
       <div class="chart-title">Temperatur °C</div>
+
       <div class="chart-container">
         <canvas id="temperatureChart"></canvas>
       </div>
@@ -348,6 +490,7 @@
 
     <div class="chart-card">
       <div class="chart-title">Luftfuktighet %</div>
+
       <div class="chart-container">
         <canvas id="humidityChart"></canvas>
       </div>
@@ -355,6 +498,7 @@
 
     <div class="chart-card">
       <div class="chart-title">Lufttryck hPa</div>
+
       <div class="chart-container">
         <canvas id="pressureChart"></canvas>
       </div>
@@ -362,8 +506,70 @@
 
     <div class="chart-card">
       <div class="chart-title">Luftkvalitet IAQ</div>
+
       <div class="chart-container">
         <canvas id="iaqChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <div>
+      <h2>Ström- och nätverkshistorik</h2>
+
+      <p>
+        Kurvor från Raspberry Pi 3 B+. Underspänningskurvan visar
+        registrerad Pi-underspänning, inte exakt nätspänning i volt.
+      </p>
+    </div>
+
+    <div id="systemHistoryStatus" class="section-status">
+      Hämtar systemhistorik...
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">Underspänning och throttling</div>
+
+      <div class="chart-note">
+        0 = normal, 1 = aktiv varning.
+      </div>
+
+      <div class="chart-container">
+        <canvas id="powerChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Nätverksfördröjning</div>
+
+      <div class="chart-note">
+        Router, internet och GitHub i millisekunder.
+      </div>
+
+      <div class="chart-container">
+        <canvas id="latencyChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Raspberry Pi-temperatur</div>
+
+      <div class="chart-container">
+        <canvas id="piTemperatureChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Paketförlust</div>
+
+      <div class="chart-note">
+        Procent paketförlust mot router, internet och GitHub.
+      </div>
+
+      <div class="chart-container">
+        <canvas id="packetLossChart"></canvas>
       </div>
     </div>
   </div>
@@ -371,6 +577,12 @@
   <script>
     const LATEST_URL = "data/latest.json";
     const HISTORY_URL = "data/history.json";
+
+    const LATEST_SYSTEM_URL =
+      "data/latest_system.json";
+
+    const HISTORY_SYSTEM_URL =
+      "data/history_system.json";
 
     const REFRESH_INTERVAL_MS = 60000;
     const MAX_FRESH_AGE_MINUTES = 15;
@@ -381,8 +593,17 @@
     let pressureChart = null;
     let iaqChart = null;
 
+    let powerChart = null;
+    let latencyChart = null;
+    let piTemperatureChart = null;
+    let packetLossChart = null;
+
     function setText(id, value) {
       const element = document.getElementById(id);
+
+      if (!element) {
+        return;
+      }
 
       element.textContent =
         value === null ||
@@ -411,11 +632,9 @@
     function formatNumber(value, digits = 2) {
       const number = toNumber(value);
 
-      if (number === null) {
-        return "--";
-      }
-
-      return number.toFixed(digits);
+      return number === null
+        ? "--"
+        : number.toFixed(digits);
     }
 
     function getTimestampText(data) {
@@ -438,11 +657,9 @@
 
       const parsed = new Date(timeText);
 
-      if (Number.isNaN(parsed.getTime())) {
-        return null;
-      }
-
-      return parsed;
+      return Number.isNaN(parsed.getTime())
+        ? null
+        : parsed;
     }
 
     function formatChartTime(date) {
@@ -454,19 +671,49 @@
       });
     }
 
-    function updateSystemStatus(data) {
-      const statusEl =
-        document.getElementById("systemStatus");
+    function setBooleanStatus(
+      elementId,
+      active,
+      activeText,
+      normalText
+    ) {
+      const element =
+        document.getElementById(elementId);
 
-      const ageEl =
-        document.getElementById("ageText");
+      if (!element) {
+        return;
+      }
+
+      if (active === true) {
+        element.textContent = activeText;
+        element.className = "value bad";
+      } else if (active === false) {
+        element.textContent = normalText;
+        element.className = "value ok";
+      } else {
+        element.textContent = "Okänt";
+        element.className = "value warn";
+      }
+    }
+
+    function updateAgeStatus(
+      data,
+      statusElementId,
+      ageElementId,
+      normalText
+    ) {
+      const statusElement =
+        document.getElementById(statusElementId);
+
+      const ageElement =
+        document.getElementById(ageElementId);
 
       const measuredAt = parseTime(data);
 
       if (!measuredAt) {
-        statusEl.textContent = "Ingen tid";
-        statusEl.className = "statusText bad";
-        ageEl.textContent = "Senaste mätning: okänd";
+        statusElement.textContent = "Ingen tid";
+        statusElement.className = "statusText bad";
+        ageElement.textContent = "Senaste mätning: okänd";
         return;
       }
 
@@ -474,21 +721,21 @@
         (Date.now() - measuredAt.getTime()) / 60000;
 
       if (ageMinutes < -2) {
-        statusEl.textContent = "Tidsfel";
-        statusEl.className = "statusText warn";
-        ageEl.textContent = "Senaste mätning: tidsfel";
+        statusElement.textContent = "Tidsfel";
+        statusElement.className = "statusText warn";
+        ageElement.textContent = "Senaste mätning: tidsfel";
         return;
       }
 
       if (ageMinutes <= MAX_FRESH_AGE_MINUTES) {
-        statusEl.textContent = "Normal";
-        statusEl.className = "statusText ok";
+        statusElement.textContent = normalText;
+        statusElement.className = "statusText ok";
       } else {
-        statusEl.textContent = "Gammal mätning";
-        statusEl.className = "statusText bad";
+        statusElement.textContent = "Gammal mätning";
+        statusElement.className = "statusText bad";
       }
 
-      ageEl.textContent =
+      ageElement.textContent =
         "Senaste mätning: " +
         Math.max(0, ageMinutes).toFixed(1) +
         " minuter sedan";
@@ -506,7 +753,7 @@
         Math.min(500, Math.round(numericValue))
       );
 
-      if (iaq >= 0 && iaq <= 50) {
+      if (iaq <= 50) {
         return {
           value: iaq,
           text: "Bra",
@@ -516,7 +763,7 @@
         };
       }
 
-      if (iaq >= 51 && iaq <= 100) {
+      if (iaq <= 100) {
         return {
           value: iaq,
           text: "Genomsnittlig",
@@ -526,7 +773,7 @@
         };
       }
 
-      if (iaq >= 101 && iaq <= 150) {
+      if (iaq <= 150) {
         return {
           value: iaq,
           text: "Lite dålig",
@@ -536,7 +783,7 @@
         };
       }
 
-      if (iaq >= 151 && iaq <= 200) {
+      if (iaq <= 200) {
         return {
           value: iaq,
           text: "Dålig",
@@ -546,7 +793,7 @@
         };
       }
 
-      if (iaq >= 201 && iaq <= 300) {
+      if (iaq <= 300) {
         return {
           value: iaq,
           text: "Sämre",
@@ -569,23 +816,26 @@
       const card =
         document.getElementById("airQualityCard");
 
-      const valueEl =
+      const valueElement =
         document.getElementById("iaqValue");
 
-      const descriptionEl =
+      const descriptionElement =
         document.getElementById("iaqDescription");
 
-      const rangeEl =
+      const rangeElement =
         document.getElementById("iaqRange");
 
       const status =
         getIaqClassification(value);
 
       if (!status) {
-        valueEl.textContent = "--";
-        descriptionEl.textContent =
+        valueElement.textContent = "--";
+
+        descriptionElement.textContent =
           "Ingen IAQ-mätning";
-        rangeEl.textContent = "IAQ 0–500";
+
+        rangeElement.textContent =
+          "IAQ 0–500";
 
         card.style.backgroundColor =
           "var(--card)";
@@ -599,13 +849,13 @@
         return;
       }
 
-      valueEl.textContent =
+      valueElement.textContent =
         status.value;
 
-      descriptionEl.textContent =
+      descriptionElement.textContent =
         status.text;
 
-      rangeEl.textContent =
+      rangeElement.textContent =
         status.range;
 
       card.style.backgroundColor =
@@ -619,40 +869,91 @@
     }
 
     function updateWaterStatus(data) {
-      const waterStatus =
+      const element =
         document.getElementById("waterStatus");
 
       if (data.water_detected === true) {
-        waterStatus.textContent = "LÄCKAGE";
-        waterStatus.className = "value bad";
+        element.textContent = "LÄCKAGE";
+        element.className = "value bad";
       } else if (data.water_detected === false) {
-        waterStatus.textContent = "Torrt";
-        waterStatus.className = "value ok";
+        element.textContent = "Torrt";
+        element.className = "value ok";
       } else {
-        waterStatus.textContent = "Okänt";
-        waterStatus.className = "value warn";
+        element.textContent = "Okänt";
+        element.className = "value warn";
       }
     }
 
     function updateAirSensorStatus(data) {
-      const airStatus =
+      const element =
         document.getElementById("airStatus");
 
       if (data.bme680_ok === true) {
-        airStatus.textContent = "OK";
-        airStatus.className = "value ok";
+        element.textContent = "OK";
+        element.className = "value ok";
       } else if (data.bme680_ok === false) {
-        airStatus.textContent = "Fel";
-        airStatus.className = "value bad";
+        element.textContent = "Fel";
+        element.className = "value bad";
       } else {
-        airStatus.textContent = "Okänt";
-        airStatus.className = "value warn";
+        element.textContent = "Okänt";
+        element.className = "value warn";
       }
+    }
+
+    function updateReachability(
+      statusId,
+      detailsId,
+      reachable,
+      latency,
+      packetLoss
+    ) {
+      const statusElement =
+        document.getElementById(statusId);
+
+      if (reachable === true) {
+        statusElement.textContent = "OK";
+        statusElement.className = "value ok";
+      } else if (reachable === false) {
+        statusElement.textContent = "Ingen kontakt";
+        statusElement.className = "value bad";
+      } else {
+        statusElement.textContent = "Okänt";
+        statusElement.className = "value warn";
+      }
+
+      setText(
+        detailsId,
+        "Svarstid: " +
+        formatNumber(latency, 3) +
+        " ms | Paketförlust: " +
+        formatNumber(packetLoss, 1) +
+        " %"
+      );
+    }
+
+    async function fetchJson(url) {
+      const response = await fetch(
+        url + "?cacheBust=" + Date.now(),
+        {
+          cache: "no-store"
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "HTTP " +
+          response.status +
+          " " +
+          response.statusText
+        );
+      }
+
+      return response.json();
     }
 
     async function loadLatestData(manual = false) {
       const statusElement =
-        document.getElementById("systemStatus");
+        document.getElementById("sensorStatus");
 
       try {
         if (manual) {
@@ -663,23 +964,8 @@
             "statusText warn";
         }
 
-        const response = await fetch(
-          LATEST_URL + "?cacheBust=" + Date.now(),
-          {
-            cache: "no-store"
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            "HTTP " +
-            response.status +
-            " " +
-            response.statusText
-          );
-        }
-
-        const data = await response.json();
+        const data =
+          await fetchJson(LATEST_URL);
 
         setText(
           "temperature",
@@ -710,11 +996,16 @@
           new Date().toLocaleString("sv-SE")
         );
 
-        updateSystemStatus(data);
+        updateAgeStatus(
+          data,
+          "sensorStatus",
+          "sensorAgeText",
+          "Normal"
+        );
 
       } catch (error) {
         console.error(
-          "Fel vid hämtning av senaste data:",
+          "Fel vid hämtning av sensordata:",
           error
         );
 
@@ -724,12 +1015,162 @@
         statusElement.className =
           "statusText bad";
 
-        document.getElementById(
-          "ageText"
-        ).textContent =
-          "Senaste mätning: --";
+        setText(
+          "sensorAgeText",
+          "Senaste mätning: --"
+        );
+      }
+    }
 
-        updateAirQuality(null);
+    async function loadLatestSystemData(
+      manual = false
+    ) {
+      const statusElement =
+        document.getElementById(
+          "piSystemStatus"
+        );
+
+      try {
+        if (manual) {
+          statusElement.textContent =
+            "Uppdaterar...";
+
+          statusElement.className =
+            "statusText warn";
+        }
+
+        const data =
+          await fetchJson(LATEST_SYSTEM_URL);
+
+        setBooleanStatus(
+          "undervoltageNow",
+          data.undervoltage_now,
+          "JA",
+          "Nej"
+        );
+
+        setBooleanStatus(
+          "throttledNow",
+          data.throttled_now,
+          "JA",
+          "Nej"
+        );
+
+        setBooleanStatus(
+          "undervoltageOccurred",
+          data.undervoltage_has_occurred,
+          "JA",
+          "Nej"
+        );
+
+        setText(
+          "piTemperature",
+          formatNumber(
+            data.pi_temperature_c,
+            1
+          )
+        );
+
+        const ethernetElement =
+          document.getElementById(
+            "ethernetStatus"
+          );
+
+        if (data.ethernet_link === true) {
+          ethernetElement.textContent = "UP";
+          ethernetElement.className = "value ok";
+        } else {
+          ethernetElement.textContent = "NED";
+          ethernetElement.className = "value bad";
+        }
+
+        setText(
+          "ethernetDetails",
+          (data.ethernet_interface || "--") +
+          " | IP: " +
+          (data.ethernet_ip || "--") +
+          " | Tillstånd: " +
+          (data.ethernet_operstate || "--")
+        );
+
+        updateReachability(
+          "routerStatus",
+          "routerDetails",
+          data.router_reachable,
+          data.router_latency_ms,
+          data.router_packet_loss_percent
+        );
+
+        updateReachability(
+          "internetStatus",
+          "internetDetails",
+          data.internet_reachable,
+          data.internet_latency_ms,
+          data.internet_packet_loss_percent
+        );
+
+        updateReachability(
+          "githubStatus",
+          "githubDetails",
+          data.github_reachable,
+          data.github_latency_ms,
+          data.github_packet_loss_percent
+        );
+
+        setText("rxErrors", data.rx_errors);
+        setText("rxDropped", data.rx_dropped);
+        setText("txErrors", data.tx_errors);
+
+        setText(
+          "systemTimeSweden",
+          getTimestampText(data)
+        );
+
+        setText(
+          "latestSystemStatus",
+          "Status: " +
+          (data.system_status || "okänd") +
+          " | " +
+          (data.throttled_hex || "--")
+        );
+
+        updateAgeStatus(
+          data,
+          "piSystemStatus",
+          "systemAgeText",
+          data.system_status === "normal"
+            ? "Normal"
+            : data.system_status
+        );
+
+        if (
+          data.undervoltage_now === true ||
+          data.throttled_now === true ||
+          data.ethernet_link === false ||
+          data.router_reachable === false ||
+          data.internet_reachable === false ||
+          data.github_reachable === false
+        ) {
+          statusElement.className =
+            "statusText bad";
+        }
+
+      } catch (error) {
+        console.error(
+          "Fel vid hämtning av systemdata:",
+          error
+        );
+
+        statusElement.textContent =
+          "Fel vid hämtning";
+
+        statusElement.className =
+          "statusText bad";
+
+        setText(
+          "systemAgeText",
+          "Senaste systemmätning: --"
+        );
       }
     }
 
@@ -762,11 +1203,8 @@
       return [];
     }
 
-    function prepareHistory(historyJson) {
-      const rows =
-        extractHistoryArray(historyJson);
-
-      return rows
+    function prepareSensorHistory(json) {
+      return extractHistoryArray(json)
         .map(function (row) {
           const time = parseTime(row);
 
@@ -791,10 +1229,67 @@
           return row !== null;
         })
         .sort(function (a, b) {
-          return (
-            a.time.getTime() -
-            b.time.getTime()
-          );
+          return a.time - b.time;
+        })
+        .slice(-MAX_HISTORY_POINTS);
+    }
+
+    function prepareSystemHistory(json) {
+      return extractHistoryArray(json)
+        .map(function (row) {
+          const time = parseTime(row);
+
+          if (!time) {
+            return null;
+          }
+
+          return {
+            time: time,
+            label: formatChartTime(time),
+
+            undervoltage:
+              row.undervoltage_now === true
+                ? 1
+                : 0,
+
+            throttled:
+              row.throttled_now === true
+                ? 1
+                : 0,
+
+            piTemperature:
+              toNumber(row.pi_temperature_c),
+
+            routerLatency:
+              toNumber(row.router_latency_ms),
+
+            internetLatency:
+              toNumber(row.internet_latency_ms),
+
+            githubLatency:
+              toNumber(row.github_latency_ms),
+
+            routerLoss:
+              toNumber(
+                row.router_packet_loss_percent
+              ),
+
+            internetLoss:
+              toNumber(
+                row.internet_packet_loss_percent
+              ),
+
+            githubLoss:
+              toNumber(
+                row.github_packet_loss_percent
+              )
+          };
+        })
+        .filter(function (row) {
+          return row !== null;
+        })
+        .sort(function (a, b) {
+          return a.time - b.time;
         })
         .slice(-MAX_HISTORY_POINTS);
     }
@@ -816,19 +1311,24 @@
 
         plugins: {
           legend: {
-            display: false
+            labels: {
+              color: "#f8fafc"
+            }
           },
 
           tooltip: {
             callbacks: {
               label: function (context) {
-                if (
-                  context.parsed.y === null
-                ) {
-                  return "Ingen mätning";
+                if (context.parsed.y === null) {
+                  return (
+                    context.dataset.label +
+                    ": Ingen mätning"
+                  );
                 }
 
                 return (
+                  context.dataset.label +
+                  ": " +
                   context.parsed.y +
                   " " +
                   unit
@@ -848,7 +1348,7 @@
 
             grid: {
               color:
-                "rgba(148, 163, 184, 0.12)"
+                "rgba(148,163,184,0.12)"
             }
           },
 
@@ -865,7 +1365,7 @@
 
             grid: {
               color:
-                "rgba(148, 163, 184, 0.15)"
+                "rgba(148,163,184,0.15)"
             }
           }
         }
@@ -876,128 +1376,85 @@
       existingChart,
       canvasId,
       labels,
-      values,
-      datasetLabel,
+      datasets,
       unit,
       suggestedMin,
       suggestedMax
     ) {
       if (existingChart) {
-        existingChart.data.labels =
-          labels;
-
-        existingChart.data.datasets[0].data =
-          values;
-
+        existingChart.data.labels = labels;
+        existingChart.data.datasets = datasets;
         existingChart.update();
-
         return existingChart;
       }
 
-      const canvas =
-        document.getElementById(canvasId);
+      return new Chart(
+        document.getElementById(canvasId),
+        {
+          type: "line",
 
-      return new Chart(canvas, {
-        type: "line",
+          data: {
+            labels: labels,
+            datasets: datasets
+          },
 
-        data: {
-          labels: labels,
-
-          datasets: [
-            {
-              label: datasetLabel,
-              data: values,
-              borderWidth: 2,
-              pointRadius:
-                labels.length > 100 ? 0 : 2,
-              pointHoverRadius: 5,
-              tension: 0.2,
-              spanGaps: true
-            }
-          ]
-        },
-
-        options: chartOptions(
-          unit,
-          suggestedMin,
-          suggestedMax
-        )
-      });
+          options: chartOptions(
+            unit,
+            suggestedMin,
+            suggestedMax
+          )
+        }
+      );
     }
 
-    async function loadHistoryData() {
-      const historyStatus =
+    function dataset(label, values) {
+      return {
+        label: label,
+        data: values,
+        borderWidth: 2,
+        pointRadius:
+          values.length > 100 ? 0 : 2,
+        pointHoverRadius: 5,
+        tension: 0.2,
+        spanGaps: true
+      };
+    }
+
+    async function loadSensorHistory() {
+      const statusElement =
         document.getElementById(
           "historyStatus"
         );
 
       try {
-        historyStatus.textContent =
-          "Hämtar historik...";
-
-        const response = await fetch(
-          HISTORY_URL +
-          "?cacheBust=" +
-          Date.now(),
-          {
-            cache: "no-store"
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            "HTTP " +
-            response.status +
-            " " +
-            response.statusText
-          );
-        }
-
-        const historyJson =
-          await response.json();
+        const json =
+          await fetchJson(HISTORY_URL);
 
         const rows =
-          prepareHistory(historyJson);
+          prepareSensorHistory(json);
 
         if (rows.length === 0) {
-          historyStatus.textContent =
-            "Ingen giltig historik hittades.";
-
+          statusElement.textContent =
+            "Ingen giltig sensorhistorik.";
           return;
         }
 
         const labels =
-          rows.map(function (row) {
-            return row.label;
-          });
-
-        const temperatures =
-          rows.map(function (row) {
-            return row.temperature;
-          });
-
-        const humidities =
-          rows.map(function (row) {
-            return row.humidity;
-          });
-
-        const pressures =
-          rows.map(function (row) {
-            return row.pressure;
-          });
-
-        const iaqValues =
-          rows.map(function (row) {
-            return row.iaq;
-          });
+          rows.map(row => row.label);
 
         temperatureChart =
           createOrUpdateChart(
             temperatureChart,
             "temperatureChart",
             labels,
-            temperatures,
-            "Temperatur",
+            [
+              dataset(
+                "Temperatur",
+                rows.map(
+                  row => row.temperature
+                )
+              )
+            ],
             "°C"
           );
 
@@ -1006,8 +1463,14 @@
             humidityChart,
             "humidityChart",
             labels,
-            humidities,
-            "Luftfuktighet",
+            [
+              dataset(
+                "Luftfuktighet",
+                rows.map(
+                  row => row.humidity
+                )
+              )
+            ],
             "%",
             0,
             100
@@ -1018,8 +1481,14 @@
             pressureChart,
             "pressureChart",
             labels,
-            pressures,
-            "Lufttryck",
+            [
+              dataset(
+                "Lufttryck",
+                rows.map(
+                  row => row.pressure
+                )
+              )
+            ],
             "hPa"
           );
 
@@ -1028,36 +1497,174 @@
             iaqChart,
             "iaqChart",
             labels,
-            iaqValues,
-            "Luftkvalitet",
+            [
+              dataset(
+                "Luftkvalitet",
+                rows.map(
+                  row => row.iaq
+                )
+              )
+            ],
             "IAQ",
             0,
             500
           );
 
-        const firstTime =
-          rows[0].time.toLocaleString("sv-SE");
-
-        const lastTime =
-          rows[
-            rows.length - 1
-          ].time.toLocaleString("sv-SE");
-
-        historyStatus.textContent =
+        statusElement.textContent =
           rows.length +
-          " mätningar visas. " +
-          firstTime +
-          " – " +
-          lastTime;
+          " sensormätningar visas.";
 
       } catch (error) {
         console.error(
-          "Fel vid hämtning av historik:",
+          "Fel vid sensorhistorik:",
           error
         );
 
-        historyStatus.textContent =
-          "Historik kunde inte hämtas.";
+        statusElement.textContent =
+          "Sensorhistorik kunde inte hämtas.";
+      }
+    }
+
+    async function loadSystemHistory() {
+      const statusElement =
+        document.getElementById(
+          "systemHistoryStatus"
+        );
+
+      try {
+        const json =
+          await fetchJson(
+            HISTORY_SYSTEM_URL
+          );
+
+        const rows =
+          prepareSystemHistory(json);
+
+        if (rows.length === 0) {
+          statusElement.textContent =
+            "Ingen giltig systemhistorik.";
+          return;
+        }
+
+        const labels =
+          rows.map(row => row.label);
+
+        powerChart =
+          createOrUpdateChart(
+            powerChart,
+            "powerChart",
+            labels,
+            [
+              dataset(
+                "Underspänning",
+                rows.map(
+                  row => row.undervoltage
+                )
+              ),
+
+              dataset(
+                "Throttling",
+                rows.map(
+                  row => row.throttled
+                )
+              )
+            ],
+            "",
+            0,
+            1
+          );
+
+        latencyChart =
+          createOrUpdateChart(
+            latencyChart,
+            "latencyChart",
+            labels,
+            [
+              dataset(
+                "Router",
+                rows.map(
+                  row => row.routerLatency
+                )
+              ),
+
+              dataset(
+                "Internet",
+                rows.map(
+                  row => row.internetLatency
+                )
+              ),
+
+              dataset(
+                "GitHub",
+                rows.map(
+                  row => row.githubLatency
+                )
+              )
+            ],
+            "ms",
+            0
+          );
+
+        piTemperatureChart =
+          createOrUpdateChart(
+            piTemperatureChart,
+            "piTemperatureChart",
+            labels,
+            [
+              dataset(
+                "Pi-temperatur",
+                rows.map(
+                  row => row.piTemperature
+                )
+              )
+            ],
+            "°C"
+          );
+
+        packetLossChart =
+          createOrUpdateChart(
+            packetLossChart,
+            "packetLossChart",
+            labels,
+            [
+              dataset(
+                "Router",
+                rows.map(
+                  row => row.routerLoss
+                )
+              ),
+
+              dataset(
+                "Internet",
+                rows.map(
+                  row => row.internetLoss
+                )
+              ),
+
+              dataset(
+                "GitHub",
+                rows.map(
+                  row => row.githubLoss
+                )
+              )
+            ],
+            "%",
+            0,
+            100
+          );
+
+        statusElement.textContent =
+          rows.length +
+          " systemmätningar visas.";
+
+      } catch (error) {
+        console.error(
+          "Fel vid systemhistorik:",
+          error
+        );
+
+        statusElement.textContent =
+          "Systemhistorik kunde inte hämtas.";
       }
     }
 
@@ -1066,7 +1673,9 @@
     ) {
       await Promise.all([
         loadLatestData(manual),
-        loadHistoryData()
+        loadLatestSystemData(manual),
+        loadSensorHistory(),
+        loadSystemHistory()
       ]);
     }
 
