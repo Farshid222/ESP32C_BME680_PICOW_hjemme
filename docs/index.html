@@ -1458,40 +1458,63 @@
             "°C"
           );
 
-        humidityChart =
-          createOrUpdateChart(
-            humidityChart,
-            "humidityChart",
-            labels,
-            [
-              dataset(
-                "Luftfuktighet",
-                rows.map(
-                  row => row.humidity
-                )
-              )
-            ],
-            "%",
-            0,
-            100
-          );
-
-        pressureChart =
-          createOrUpdateChart(
-            pressureChart,
-            "pressureChart",
-            labels,
-            [
-              dataset(
-                "Lufttryck",
-                rows.map(
-                  row => row.pressure
-                )
-              )
-            ],
-            "hPa"
-          );
-
+    const validHumidityValues = rows
+      .map(row => row.humidity)
+      .filter(value => value !== null);
+    
+    let humidityMin = 0;
+    let humidityMax = 100;
+    
+    if (validHumidityValues.length > 0) {
+      const lowestHumidity =
+        Math.min(...validHumidityValues);
+    
+      const highestHumidity =
+        Math.max(...validHumidityValues);
+    
+      humidityMin = Math.max(
+        0,
+        Math.floor(lowestHumidity) - 2
+      );
+    
+      humidityMax = Math.min(
+        100,
+        Math.ceil(highestHumidity) + 2
+      );
+    
+      if (humidityMax - humidityMin < 10) {
+        const center =
+          (humidityMin + humidityMax) / 2;
+    
+        humidityMin = Math.max(
+          0,
+          Math.floor(center - 5)
+        );
+    
+        humidityMax = Math.min(
+          100,
+          Math.ceil(center + 5)
+        );
+      }
+    }
+    
+    humidityChart =
+      createOrUpdateChart(
+        humidityChart,
+        "humidityChart",
+        labels,
+        [
+          dataset(
+            "Luftfuktighet",
+            rows.map(
+              row => row.humidity
+            )
+          )
+        ],
+        "%",
+        humidityMin,
+        humidityMax
+      );
         const validIaqValues = rows
           .map(row => row.iaq)
           .filter(value => value !== null);
