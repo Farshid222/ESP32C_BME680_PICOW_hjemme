@@ -511,6 +511,18 @@
         <canvas id="iaqChart"></canvas>
       </div>
     </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Vattenläckagehistorik</div>
+
+      <div class="chart-note">
+        0 = torrt, 1 = vattenläckage.
+      </div>
+
+      <div class="chart-container">
+        <canvas id="waterChart"></canvas>
+      </div>
+    </div>
   </div>
 
   <div class="section-header">
@@ -592,6 +604,7 @@
     let humidityChart = null;
     let pressureChart = null;
     let iaqChart = null;
+    let waterChart = null;
 
     let powerChart = null;
     let latencyChart = null;
@@ -1222,7 +1235,9 @@
             pressure:
               toNumber(row.pressure_hpa),
             iaq:
-              toNumber(row.iaq)
+              toNumber(row.iaq),
+            waterDetected:
+              row.water_detected === true ? 1 : 0
           };
         })
         .filter(function (row) {
@@ -1360,7 +1375,12 @@
               suggestedMax,
 
             ticks: {
-              color: "#cbd5e1"
+              color: "#cbd5e1",
+              stepSize:
+                suggestedMin === 0 &&
+                suggestedMax === 1
+                  ? 1
+                  : undefined
             },
 
             grid: {
@@ -1515,6 +1535,57 @@
         humidityMin,
         humidityMax
       );
+
+        const validPressureValues = rows
+          .map(row => row.pressure)
+          .filter(value => value !== null);
+
+        let pressureMin;
+        let pressureMax;
+
+        if (validPressureValues.length > 0) {
+          const lowestPressure =
+            Math.min(...validPressureValues);
+
+          const highestPressure =
+            Math.max(...validPressureValues);
+
+          pressureMin =
+            Math.floor(lowestPressure) - 2;
+
+          pressureMax =
+            Math.ceil(highestPressure) + 2;
+
+          if (pressureMax - pressureMin < 10) {
+            const center =
+              (pressureMin + pressureMax) / 2;
+
+            pressureMin =
+              Math.floor(center - 5);
+
+            pressureMax =
+              Math.ceil(center + 5);
+          }
+        }
+
+        pressureChart =
+          createOrUpdateChart(
+            pressureChart,
+            "pressureChart",
+            labels,
+            [
+              dataset(
+                "Lufttryck",
+                rows.map(
+                  row => row.pressure
+                )
+              )
+            ],
+            "hPa",
+            pressureMin,
+            pressureMax
+          );
+
         const validIaqValues = rows
           .map(row => row.iaq)
           .filter(value => value !== null);
@@ -1542,28 +1613,44 @@
         }
         
         iaqChart =
-          createOrUpdateChart(
-            iaqChart,
-            "iaqChart",
-            labels,
-            [
-              dataset(
-                "Luftkvalitet",
-                rows.map(
-                  row => row.iaq
-                )
-              )
-            ],
-            "IAQ",
-            iaqMin,
-            iaqMax
-          );
+  createOrUpdateChart(
+    iaqChart,
+    "iaqChart",
+    labels,
+    [
+      dataset(
+        "Luftkvalitet",
+        rows.map(
+          row => row.iaq
+        )
+      )
+    ],
+    "IAQ",
+    iaqMin,
+    iaqMax
+  );
 
-        
-        statusElement.textContent =
-          rows.length +
-          " sensormätningar visas.";
+waterChart =
+  createOrUpdateChart(
+    waterChart,
+    "waterChart",
+    labels,
+    [
+      dataset(
+        "Vattenläckage",
+        rows.map(
+          row => row.waterDetected
+        )
+      )
+    ],
+    "",
+    0,
+    1
+  );
 
+statusElement.textContent =
+  rows.length +
+  " sensormätningar visas.";
       } catch (error) {
         console.error(
           "Fel vid sensorhistorik:",
